@@ -388,6 +388,13 @@
     .mini .hint { display: none; }
     .big-plus { min-height: 48px; }
   }
+  /* iPhone haptics: invisible label over a button, wired to a hidden switch */
+  .haptic-hit {
+    position: absolute; inset: 0; border-radius: inherit; z-index: 2;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent; cursor: pointer;
+  }
+  .haptic-hit input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+  html.no-haptics .haptic-hit { display: none; }
   .bump { animation: bump .18s ease-out; }
   @keyframes bump { 50% { transform: scale(1.06); } }
 </style>
@@ -632,13 +639,34 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(() => t.classList.remove('show'), 1800);
   }
-  /* Haptics. Android: Vibration API. iPhone: Safari has no Vibration API, but clicking an
-     <input type=checkbox switch> gives a system haptic tick, so we click a hidden one. */
+  /* Haptics.
+     Android: Vibration API.
+     iPhone: Safari has no Vibration API. Toggling an <input type=checkbox switch> gives a
+     system haptic, but newer iOS only does it for a REAL finger tap, not a click from code.
+     So each important button gets an invisible <label> on top, wired to a hidden switch.
+     Your tap lands on the label, Safari toggles the switch (haptic), and the tap still
+     bubbles up to the button so it works as normal. */
   const canVibrate = typeof navigator.vibrate === 'function';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function addHaptic(el) {
+    if (!el || el.querySelector(':scope > .haptic-hit')) return;
+    const label = document.createElement('label');
+    label.className = 'haptic-hit';
+    label.setAttribute('aria-hidden', 'true');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    input.tabIndex = -1;
+    input.addEventListener('click', e => e.stopPropagation()); // only the label's click reaches the button
+    label.append(input);
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    el.append(label);
+  }
+  // older iOS (17.4 to 26.4) also ticks from code, which adds extra taps for "strong"/"success"
   function iosTick() {
     try {
       const label = document.createElement('label');
-      label.setAttribute('aria-hidden', 'true');
       label.style.display = 'none';
       const input = document.createElement('input');
       input.type = 'checkbox';
@@ -654,7 +682,8 @@
     if (!state.vibrate) return;
     const patterns = { light: 10, medium: 20, strong: 60, success: [60, 70, 60, 70, 80] };
     if (canVibrate) { navigator.vibrate(patterns[kind] || 15); return; }
-    iosTick();
+    if (!isIOS) return;
+    // the first tick comes from the finger tap on the overlay; these are extras
     // iPhone can't change how hard a tick is, so stack quick ticks to make it feel heavier
     if (kind === 'strong') setTimeout(iosTick, 45);
     if (kind === 'success') { setTimeout(iosTick, 45); setTimeout(iosTick, 160); setTimeout(iosTick, 205); setTimeout(iosTick, 320); }
@@ -1014,6 +1043,15 @@
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+
+  if (isIOS && !canVibrate) {
+    ['rowPlus', 'rowMinus', 'undoBtn', 'repeatPlus', 'repeatMinus', 'timerBtn',
+     'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn'].forEach(id => addHaptic($(id)));
+    document.querySelectorAll('.tabbar button').forEach(addHaptic);
+  }
+  const syncHapticSetting = () => document.documentElement.classList.toggle('no-haptics', !state.vibrate);
+  syncHapticSetting();
+  $('vibrateToggle').addEventListener('change', syncHapticSetting);
 
   showTab(['counter', 'projects', 'notes', 'settings'].includes(state.tab) ? state.tab : 'counter');
   updateWake();
