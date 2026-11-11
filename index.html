@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Row Counter</title>
+<meta name="description" content="A simple crochet row and stitch counter that saves your projects on your device.">
+<meta name="theme-color" content="#c2546f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Row Counter">
+<style>
+  :root {
+    --bg: #fbf6f2;
+    --card: #ffffff;
+    --text: #2d2326;
+    --muted: #8a7b7f;
+    --line: #eadfdb;
+    --accent: #c2546f;
+    --accent-soft: #f6dde3;
+    --accent-text: #ffffff;
+    --good: #4f8a64;
+    --shadow: 0 1px 2px rgba(60,30,40,.06), 0 4px 16px rgba(60,30,40,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1618;
+      --card: #262022;
+      --text: #f3eaec;
+      --muted: #a8979c;
+      --line: #3a3134;
+      --accent: #e27a93;
+      --accent-soft: #43282f;
+      --accent-text: #1b1618;
+      --good: #7dbb91;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+    max-width: 520px;
+    margin: 0 auto;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+  input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user-select: text; }
+
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 0 10px;
+  }
+  header h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 650; letter-spacing: -.01em; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: grid; place-items: center;
+    background: var(--card); box-shadow: var(--shadow);
+    border: 1px solid var(--line);
+  }
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  .project-bar {
+    display: flex; gap: 8px; align-items: center;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 6px 6px 6px 14px; box-shadow: var(--shadow);
+  }
+  .project-bar input {
+    flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
+    font-weight: 600; font-size: 17px; padding: 6px 0;
+  }
+
+  .main-counter {
+    margin-top: 16px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 22px; box-shadow: var(--shadow);
+    padding: 18px 16px 16px;
+    text-align: center;
+  }
+  .label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .row-num {
+    font-size: clamp(88px, 30vw, 140px); font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums; margin: 6px 0 4px; letter-spacing: -.03em;
+  }
+  .goal-line { color: var(--muted); font-size: 15px; min-height: 21px; }
+  .goal-line.done { color: var(--good); font-weight: 600; }
+  .progress { height: 6px; background: var(--accent-soft); border-radius: 99px; overflow: hidden; margin: 10px 8px 0; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+
+  .big-plus {
+    margin-top: 16px; width: 100%;
+    height: 132px; border-radius: 20px;
+    background: var(--accent); color: var(--accent-text);
+    font-size: 56px; font-weight: 600;
+    display: grid; place-items: center;
+    transition: transform .06s;
+  }
+  .big-plus:active { transform: scale(.98); }
+  .row-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .row-actions button {
+    flex: 1; height: 52px; border-radius: 14px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 650; font-size: 17px;
+  }
+
+  .sub-counters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .sub {
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 12px; text-align: center; box-shadow: var(--shadow);
+  }
+  .sub .val { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; margin: 4px 0 8px; }
+  .sub .hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-top: -4px; margin-bottom: 6px; }
+  .sub .btns { display: flex; gap: 8px; }
+  .sub .btns button {
+    flex: 1; height: 44px; border-radius: 12px; font-size: 22px; font-weight: 600;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .sub .btns button.plus { background: var(--accent); color: var(--accent-text); }
+
+  .notes {
+    margin-top: 16px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow);
+  }
+  .notes textarea {
+    width: 100%; min-height: 70px; resize: vertical; border: 0; outline: none;
+    background: transparent; margin-top: 6px; font-size: 15px;
+  }
+  .footer-row { display: flex; gap: 10px; margin: 16px 0 24px; }
+  .footer-row button {
+    flex: 1; height: 46px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--card); font-weight: 600; font-size: 15px;
+  }
+  .footer-row button.danger { color: #c0392b; }
+
+  /* sheets */
+  .backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.35);
+    display: none; align-items: flex-end; justify-content: center; z-index: 10;
+  }
+  .backdrop.open { display: flex; }
+  .sheet {
+    background: var(--bg); width: 100%; max-width: 520px;
+    border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    max-height: 85vh; overflow: auto;
+  }
+  .sheet h2 { margin: 0 0 12px; font-size: 18px; }
+  .proj-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 14px; margin-bottom: 8px; width: 100%; text-align: left;
+  }
+  .proj-item.active { border-color: var(--accent); }
+  .proj-item .name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj-item .meta { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .primary {
+    width: 100%; height: 50px; border-radius: 14px; background: var(--accent);
+    color: var(--accent-text); font-weight: 650; margin-top: 6px;
+  }
+  .field { display: block; margin-bottom: 12px; }
+  .field span { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+  .field input {
+    width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); padding: 0 12px; outline: none;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); }
+  .toggle input { width: 22px; height: 22px; accent-color: var(--accent); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 99px;
+    font-size: 14px; font-weight: 600; transition: all .2s; pointer-events: none; z-index: 20;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .reminder {
+    display: none; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 15px; text-align: left;
+  }
+  .reminder.show { display: block; }
+  .reminder .next { display: block; font-weight: 500; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .timer {
+    margin-top: 16px; display: flex; align-items: center; gap: 12px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 10px 10px 10px 14px; box-shadow: var(--shadow);
+  }
+  .timer .t { flex: 1; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .timer .label { display: block; }
+  .timer button {
+    height: 44px; padding: 0 18px; border-radius: 12px; font-weight: 650;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .timer button.running { background: var(--accent); color: var(--accent-text); }
+  .field textarea {
+    width: 100%; min-height: 90px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); padding: 10px 12px; outline: none; resize: vertical; font-size: 15px;
+  }
+  .field textarea:focus { border-color: var(--accent); }
+  .sheet .secondary {
+    width: 100%; height: 46px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--card); font-weight: 600; margin-top: 8px;
+  }
+  .sheet h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 18px 0 6px; }
+  .bump { animation: bump .18s ease-out; }
+  @keyframes bump { 50% { transform: scale(1.06); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧶 Row Counter</h1>
+  <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--card)"/><circle cx="15" cy="12" r="2" fill="var(--card)"/><circle cx="8" cy="18" r="2" fill="var(--card)"/></svg>
+  </button>
+</header>
+
+<div class="project-bar">
+  <input id="projName" maxlength="60" aria-label="Project name">
+  <button class="icon-btn" id="projectsBtn" aria-label="Switch project">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>
+  </button>
+</div>
+
+<section class="main-counter">
+  <div class="label" id="rowLabel">Row</div>
+  <div class="row-num" id="rowNum">0</div>
+  <div class="goal-line" id="goalLine"></div>
+  <div class="progress" id="progressWrap"><div id="progressBar"></div></div>
+  <div class="reminder" id="reminder"></div>
+</section>
+
+<button class="big-plus" id="rowPlus" aria-label="Add a row">+</button>
+<div class="row-actions">
+  <button id="rowMinus">− <span id="rowWord">Row</span></button>
+  <button id="undoBtn">Undo</button>
+</div>
+
+<div class="sub-counters">
+  <div class="sub">
+    <div class="label">Stitches</div>
+    <div class="val" id="stitchVal">0</div>
+    <div class="hint" id="stitchHint"></div>
+    <div class="btns">
+      <button data-act="stitch-">−</button>
+      <button class="plus" data-act="stitch+">+</button>
+    </div>
+  </div>
+  <div class="sub">
+    <div class="label">Repeats</div>
+    <div class="val" id="repeatVal">0</div>
+    <div class="hint" id="repeatHint"></div>
+    <div class="btns">
+      <button data-act="repeat-">−</button>
+      <button class="plus" data-act="repeat+">+</button>
+    </div>
+  </div>
+</div>
+
+<section class="timer">
+  <div class="t"><span class="label">Time on project</span><span id="timeVal">0:00:00</span></div>
+  <button id="timerBtn">Start</button>
+</section>
+
+<section class="notes">
+  <div class="label">Pattern notes</div>
+  <textarea id="notes" placeholder="e.g. Row 4: ch 3, *dc in next 2, 2dc in next* repeat to end"></textarea>
+</section>
+
+<div class="footer-row">
+  <button id="resetBtn" class="danger">Reset counters</button>
+</div>
+
+<!-- Projects sheet -->
+<div class="backdrop" id="projectsSheet">
+  <div class="sheet">
+    <h2>Projects</h2>
+    <div id="projList"></div>
+    <button class="primary" id="newProjBtn">+ New project</button>
+    <button class="primary" id="deleteProjBtn" style="background:transparent;color:#c0392b;border:1px solid var(--line)">Delete current project</button>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="backdrop" id="settingsSheet">
+  <div class="sheet">
+    <h2>Project settings</h2>
+    <label class="field"><span>Total rows in pattern (0 = no goal)</span><input type="number" inputmode="numeric" min="0" id="goalInput"></label>
+    <label class="field"><span>Stitches per row (0 = off). Row goes up when you hit it.</span><input type="number" inputmode="numeric" min="0" id="stitchGoalInput"></label>
+    <label class="field"><span>Rows per repeat (0 = off). Repeats go up automatically.</span><input type="number" inputmode="numeric" min="0" id="repeatEveryInput"></label>
+    <label class="field"><span>Row reminders, one per line like <b>12: change color</b>. Pops up when you get to that row.</span><textarea id="remindersInput" placeholder="12: change to blue&#10;20: start decreases"></textarea></label>
+    <div class="toggle"><span>Working in the round (say "Round" instead of "Row")</span><input type="checkbox" id="roundToggle"></div>
+    <div class="toggle"><span>Vibrate on tap</span><input type="checkbox" id="vibrateToggle"></div>
+    <div class="toggle"><span>Keep screen awake</span><input type="checkbox" id="wakeToggle"></div>
+    <button class="primary" id="closeSettings">Done</button>
+    <h3>Backup</h3>
+    <button class="secondary" id="exportBtn">Save backup file</button>
+    <button class="secondary" id="importBtn">Restore from backup</button>
+    <button class="secondary" id="resetTimerBtn">Reset timer for this project</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const KEY = 'crochet-row-counter-v2';
+  const OLD_KEY = 'crochet-row-counter-v1'; // twister app; same GitHub Pages origin
+  const $ = id => document.getElementById(id);
+
+  const blankProject = (name) => ({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name, row: 0, stitch: 0, repeat: 0,
+    goal: 0, stitchGoal: 0, repeatEvery: 0,
+    notes: '', updated: Date.now(),
+    round: false, reminders: '', time: 0, timerStart: 0
+  });
+  const fixProject = p => Object.assign(blankProject(p.name || 'Untitled'), p);
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && Array.isArray(s.projects) && s.projects.length) {
+          s.projects = s.projects.map(fixProject);
+          return s;
+        }
+      }
+    } catch (e) {}
+    const p = blankProject('My project');
+    return { projects: [p], current: p.id, vibrate: true, wake: false };
+  }
+
+  let state = load();
+  let history = []; // undo stack for current session
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  const cur = () => state.projects.find(p => p.id === state.current) || state.projects[0];
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), 1600);
+  }
+  function buzz(ms = 15) {
+    if (state.vibrate && navigator.vibrate) navigator.vibrate(ms);
+  }
+  function bump(el) {
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+
+  function parseReminders(text) {
+    const out = {};
+    (text || '').split('\n').forEach(line => {
+      const m = line.match(/^\s*(?:row|round|rnd|r)?\s*(\d+)\s*[:.)\-–]\s*(.+)$/i);
+      if (m) (out[+m[1]] = out[+m[1]] || []).push(m[2].trim());
+    });
+    return out;
+  }
+  const word = p => p.round ? 'Round' : 'Row';
+  function elapsed(p) { return p.time + (p.timerStart ? Date.now() - p.timerStart : 0); }
+  function fmt(ms) {
+    const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  function renderTimer() {
+    const p = cur();
+    $('timeVal').textContent = fmt(elapsed(p));
+    $('timerBtn').textContent = p.timerStart ? 'Pause' : 'Start';
+    $('timerBtn').classList.toggle('running', !!p.timerStart);
+  }
+
+  function render() {
+    const p = cur();
+    const w = word(p);
+    $('rowLabel').textContent = w;
+    $('rowWord').textContent = w;
+    $('rowPlus').setAttribute('aria-label', 'Add a ' + w.toLowerCase());
+    if (document.activeElement !== $('projName')) $('projName').value = p.name;
+    if (document.activeElement !== $('notes')) $('notes').value = p.notes;
+    $('rowNum').textContent = p.row;
+    $('stitchVal').textContent = p.stitch;
+    $('repeatVal').textContent = p.repeat;
+
+    const gl = $('goalLine');
+    if (p.goal > 0) {
+      const left = p.goal - p.row;
+      gl.textContent = left > 0 ? `of ${p.goal} · ${left} to go` : `Pattern done! 🎉 (${p.goal} ${w.toLowerCase()}s)`;
+      gl.classList.toggle('done', left <= 0);
+      $('progressWrap').style.display = '';
+      $('progressBar').style.width = Math.min(100, p.row / p.goal * 100) + '%';
+    } else {
+      gl.textContent = `Tap + after each ${w.toLowerCase()}`;
+      gl.classList.remove('done');
+      $('progressWrap').style.display = 'none';
+    }
+    $('stitchHint').textContent = p.stitchGoal > 0 ? `of ${p.stitchGoal}` : '';
+    $('repeatHint').textContent = p.repeatEvery > 0
+      ? `${w.toLowerCase()} ${p.row % p.repeatEvery || (p.row ? p.repeatEvery : 0)} of ${p.repeatEvery}` : '';
+    // reminders: show what's for this row, and peek at the next one
+    const rem = parseReminders(p.reminders);
+    const here = rem[p.row];
+    const nextRow = Object.keys(rem).map(Number).filter(n => n > p.row).sort((a, b) => a - b)[0];
+    const box = $('reminder');
+    box.textContent = '';
+    if (here || nextRow) {
+      if (here) box.append(`📌 ${w} ${p.row}: ${here.join(' · ')}`);
+      if (nextRow) {
+        const n = document.createElement('span'); n.className = 'next';
+        n.textContent = `Next: ${w.toLowerCase()} ${nextRow}, ${rem[nextRow].join(' · ')}`;
+        box.append(n);
+      }
+      box.classList.add('show');
+    } else box.classList.remove('show');
+    renderTimer();
+    $('undoBtn').disabled = !history.length;
+    $('undoBtn').style.opacity = history.length ? 1 : .45;
+  }
+
+  function snapshot() {
+    const p = cur();
+    history.push({ id: p.id, row: p.row, stitch: p.stitch, repeat: p.repeat });
+    if (history.length > 200) history.shift();
+  }
+
+  function changeRow(d) {
+    const p = cur();
+    const before = p.row;
+    p.row = Math.max(0, p.row + d);
+    if (p.row === before) return;
+    if (d > 0) p.stitch = 0;
+    if (p.repeatEvery > 0) {
+      if (d > 0 && p.row % p.repeatEvery === 0) { p.repeat++; toast(`Repeat ${p.repeat} done`); }
+      if (d < 0 && before % p.repeatEvery === 0 && p.repeat > 0) p.repeat--;
+    }
+    const rem = d > 0 && parseReminders(p.reminders)[p.row];
+    if (d > 0 && p.goal > 0 && p.row === p.goal) { toast(`Last ${word(p).toLowerCase()} done! 🎉`); buzz([40, 60, 40]); }
+    else if (rem) { toast(`📌 ${rem.join(' · ')}`); buzz([30, 50, 30]); }
+    else buzz();
+    bump($('rowNum'));
+  }
+
+  function act(kind) {
+    const p = cur();
+    snapshot();
+    switch (kind) {
+      case 'row+': changeRow(1); break;
+      case 'row-': changeRow(-1); break;
+      case 'stitch+':
+        p.stitch++; buzz(10); bump($('stitchVal'));
+        if (p.stitchGoal > 0 && p.stitch >= p.stitchGoal) { changeRow(1); toast(`${word(p)} ${p.row} started`); }
+        break;
+      case 'stitch-': p.stitch = Math.max(0, p.stitch - 1); buzz(10); break;
+      case 'repeat+': p.repeat++; buzz(10); bump($('repeatVal')); break;
+      case 'repeat-': p.repeat = Math.max(0, p.repeat - 1); buzz(10); break;
+    }
+    p.updated = Date.now();
+    save(); render();
+  }
+
+  $('rowPlus').addEventListener('click', () => act('row+'));
+  $('rowNum').addEventListener('click', () => act('row+'));
+  $('rowMinus').addEventListener('click', () => act('row-'));
+  document.querySelectorAll('[data-act]').forEach(b =>
+    b.addEventListener('click', () => act(b.dataset.act)));
+
+  $('undoBtn').addEventListener('click', () => {
+    const h = history.pop();
+    if (!h) return;
+    const p = state.projects.find(x => x.id === h.id);
+    if (p) { p.row = h.row; p.stitch = h.stitch; p.repeat = h.repeat; }
+    if (h.id !== state.current && p) state.current = p.id;
+    buzz(); save(); render(); toast('Undone');
+  });
+
+  $('resetBtn').addEventListener('click', () => {
+    if (!confirm('Reset row, stitch and repeat counts to 0 for this project?')) return;
+    snapshot();
+    const p = cur(); p.row = 0; p.stitch = 0; p.repeat = 0;
+    save(); render(); toast('Counters reset (Undo to bring them back)');
+  });
+
+  $('projName').addEventListener('input', e => { cur().name = e.target.value || 'Untitled'; save(); });
+  $('projName').addEventListener('blur', render);
+  $('notes').addEventListener('input', e => { cur().notes = e.target.value; save(); });
+
+  // keyboard: space/enter/up = row+, down/backspace = row-, z = undo
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea')) return;
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp') { e.preventDefault(); act('row+'); }
+    else if (e.key === 'ArrowDown' || e.key === 'Backspace') { e.preventDefault(); act('row-'); }
+    else if (e.key.toLowerCase() === 'z') $('undoBtn').click();
+  });
+
+  // sheets
+  function openSheet(id) { $(id).classList.add('open'); }
+  function closeSheet(id) { $(id).classList.remove('open'); }
+  document.querySelectorAll('.backdrop').forEach(b =>
+    b.addEventListener('click', e => { if (e.target === b) { closeSheet(b.id); if (b.id === 'settingsSheet') applySettings(); } }));
+
+  function renderProjects() {
+    const list = $('projList');
+    list.innerHTML = '';
+    [...state.projects].sort((a, b) => b.updated - a.updated).forEach(p => {
+      const b = document.createElement('button');
+      b.className = 'proj-item' + (p.id === state.current ? ' active' : '');
+      const n = document.createElement('span'); n.className = 'name'; n.textContent = p.name;
+      const m = document.createElement('span'); m.className = 'meta';
+      m.textContent = `${word(p)} ${p.row}${p.goal ? '/' + p.goal : ''}`;
+      b.append(n, m);
+      b.addEventListener('click', () => { state.current = p.id; save(); render(); closeSheet('projectsSheet'); });
+      list.appendChild(b);
+    });
+    $('deleteProjBtn').style.display = state.projects.length > 1 ? '' : 'none';
+  }
+  $('projectsBtn').addEventListener('click', () => { renderProjects(); openSheet('projectsSheet'); });
+  $('newProjBtn').addEventListener('click', () => {
+    const name = prompt('Project name', `Project ${state.projects.length + 1}`);
+    if (name === null) return;
+    const p = blankProject(name.trim() || 'Untitled');
+    state.projects.push(p); state.current = p.id;
+    save(); render(); closeSheet('projectsSheet');
+  });
+  $('deleteProjBtn').addEventListener('click', () => {
+    const p = cur();
+    if (!confirm(`Delete "${p.name}"? This can't be undone.`)) return;
+    state.projects = state.projects.filter(x => x.id !== p.id);
+    state.current = state.projects[0].id;
+    history = history.filter(h => h.id !== p.id);
+    save(); render(); renderProjects();
+  });
+
+  $('settingsBtn').addEventListener('click', () => {
+    const p = cur();
+    $('goalInput').value = p.goal || '';
+    $('stitchGoalInput').value = p.stitchGoal || '';
+    $('repeatEveryInput').value = p.repeatEvery || '';
+    $('remindersInput').value = p.reminders || '';
+    $('roundToggle').checked = !!p.round;
+    $('vibrateToggle').checked = !!state.vibrate;
+    $('wakeToggle').checked = !!state.wake;
+    openSheet('settingsSheet');
+  });
+  const num = id => Math.max(0, parseInt($(id).value, 10) || 0);
+  function applySettings() {
+    const p = cur();
+    p.goal = num('goalInput');
+    p.stitchGoal = num('stitchGoalInput');
+    p.repeatEvery = num('repeatEveryInput');
+    p.reminders = $('remindersInput').value;
+    p.round = $('roundToggle').checked;
+    state.vibrate = $('vibrateToggle').checked;
+    state.wake = $('wakeToggle').checked;
+    save(); render(); updateWake();
+  }
+  $('closeSettings').addEventListener('click', () => { applySettings(); closeSheet('settingsSheet'); });
+
+  // project timer: only one project runs at a time
+  function pauseTimer(p) {
+    if (p.timerStart) { p.time += Date.now() - p.timerStart; p.timerStart = 0; }
+  }
+  $('timerBtn').addEventListener('click', () => {
+    const p = cur();
+    if (p.timerStart) pauseTimer(p);
+    else { state.projects.forEach(pauseTimer); p.timerStart = Date.now(); }
+    buzz(); save(); renderTimer();
+  });
+  $('resetTimerBtn').addEventListener('click', () => {
+    if (!confirm('Set the timer for this project back to 0?')) return;
+    const p = cur(); p.time = 0; p.timerStart = p.timerStart ? Date.now() : 0;
+    save(); renderTimer(); toast('Timer reset');
+  });
+  setInterval(() => { if (cur().timerStart) renderTimer(); }, 500);
+
+  // backup / restore
+  $('exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `row-counter-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('Backup saved');
+  });
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const s = JSON.parse(await f.text());
+      if (!s || !Array.isArray(s.projects) || !s.projects.length) throw 0;
+      if (!confirm(`Replace everything here with ${s.projects.length} project(s) from the backup?`)) return;
+      s.projects = s.projects.map(fixProject);
+      if (!s.projects.some(p => p.id === s.current)) s.current = s.projects[0].id;
+      state = s; history = [];
+      save(); render(); closeSheet('settingsSheet'); toast('Backup restored');
+    } catch (err) { alert("That file doesn't look like a Row Counter backup."); }
+  });
+
+  // keep screen awake while crocheting
+  let wakeLock = null;
+  async function updateWake() {
+    try {
+      if (state.wake && 'wakeLock' in navigator && document.visibilityState === 'visible') {
+        if (!wakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+        }
+      } else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', updateWake);
+
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
+  render(); updateWake();
+})();
+</script>
+</body>
+</html>
