@@ -347,7 +347,8 @@
       padding-right: calc(var(--rail-w) + var(--rail-gap) + 12px);
     }
     .tabbar {
-      left: auto; right: var(--rail-gap); bottom: max(env(safe-area-inset-bottom), 14px);
+      left: auto; right: var(--rail-gap); bottom: auto;
+      top: 50%; transform: translateY(-50%);
       width: var(--rail-w); max-width: none; margin: 0;
     }
     .tabbar nav {
