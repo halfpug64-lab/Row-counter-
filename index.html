@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Row Counter</title>
-<meta name="description" content="A simple crochet row and stitch counter that saves your projects on your device.">
-<meta name="theme-color" content="#c2546f">
+<meta name="description" content="A simple crochet row counter that saves your projects on your device.">
+<meta name="theme-color" content="#fbf6f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1618" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Row Counter">
 <style>
   :root {
@@ -22,7 +24,10 @@
     --accent-soft: #f6dde3;
     --accent-text: #ffffff;
     --good: #4f8a64;
-    --shadow: 0 1px 2px rgba(60,30,40,.06), 0 4px 16px rgba(60,30,40,.06);
+    --danger: #c0392b;
+    --bar: rgba(251, 246, 242, .88);
+    --shadow: 0 1px 2px rgba(60,30,40,.05), 0 6px 20px rgba(60,30,40,.06);
+    --tabbar-h: 62px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -35,274 +40,402 @@
       --accent-soft: #43282f;
       --accent-text: #1b1618;
       --good: #7dbb91;
+      --danger: #ff6b5e;
+      --bar: rgba(27, 22, 24, .88);
       --shadow: none;
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; min-height: 100%; }
   body {
     background: var(--bg);
     color: var(--text);
     font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
-    max-width: 520px;
-    margin: 0 auto;
     user-select: none;
     -webkit-user-select: none;
   }
-  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
   input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user-select: text; }
+  svg { display: block; }
 
-  header {
-    display: flex; align-items: center; gap: 8px;
-    padding: 14px 0 10px;
+  /* ---------- page shell ---------- */
+  .view {
+    display: none;
+    max-width: 560px; margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 8px) 16px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px);
   }
-  header h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 650; letter-spacing: -.01em; }
-  .icon-btn {
-    width: 40px; height: 40px; border-radius: 12px;
+  .view.active { display: block; }
+  .top {
+    display: flex; align-items: flex-end; gap: 12px;
+    padding: 18px 2px 14px;
+  }
+  .top .titles { flex: 1; min-width: 0; }
+  .eyebrow { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+  .top h1 {
+    margin: 2px 0 0; font-size: 28px; line-height: 1.15; font-weight: 750; letter-spacing: -.02em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .round-btn {
+    flex: none; width: 42px; height: 42px; border-radius: 50%;
     display: grid; place-items: center;
-    background: var(--card); box-shadow: var(--shadow);
-    border: 1px solid var(--line);
+    background: var(--accent); color: var(--accent-text);
+    box-shadow: var(--shadow);
   }
-  .icon-btn svg { width: 20px; height: 20px; }
+  .round-btn svg { width: 22px; height: 22px; }
+  .round-btn.soft { background: var(--card); color: var(--text); border: 1px solid var(--line); }
 
-  .project-bar {
-    display: flex; gap: 8px; align-items: center;
+  .card {
     background: var(--card); border: 1px solid var(--line);
-    border-radius: 14px; padding: 6px 6px 6px 14px; box-shadow: var(--shadow);
+    border-radius: 20px; box-shadow: var(--shadow);
   }
-  .project-bar input {
-    flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
-    font-weight: 600; font-size: 17px; padding: 6px 0;
+  .label {
+    font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .09em; font-weight: 650;
   }
 
-  .main-counter {
-    margin-top: 16px;
-    background: var(--card); border: 1px solid var(--line);
-    border-radius: 22px; box-shadow: var(--shadow);
-    padding: 18px 16px 16px;
-    text-align: center;
-  }
-  .label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  /* ---------- counter tab ---------- */
+  .counter-card { padding: 22px 18px 18px; text-align: center; }
   .row-num {
-    font-size: clamp(88px, 30vw, 140px); font-weight: 700; line-height: 1;
-    font-variant-numeric: tabular-nums; margin: 6px 0 4px; letter-spacing: -.03em;
+    font-size: clamp(96px, 32vw, 150px); font-weight: 750; line-height: 1;
+    font-variant-numeric: tabular-nums; margin: 8px 0 6px; letter-spacing: -.04em;
   }
   .goal-line { color: var(--muted); font-size: 15px; min-height: 21px; }
-  .goal-line.done { color: var(--good); font-weight: 600; }
-  .progress { height: 6px; background: var(--accent-soft); border-radius: 99px; overflow: hidden; margin: 10px 8px 0; }
-  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .goal-line.done { color: var(--good); font-weight: 650; }
+  .progress { height: 6px; background: var(--accent-soft); border-radius: 99px; overflow: hidden; margin: 12px 10px 0; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+  .reminder {
+    display: none; margin-top: 14px; padding: 10px 12px; border-radius: 12px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 650; font-size: 15px; text-align: left;
+  }
+  .reminder.show { display: block; }
+  .reminder .next { display: block; font-weight: 500; color: var(--muted); font-size: 13px; margin-top: 2px; }
 
   .big-plus {
-    margin-top: 16px; width: 100%;
-    height: 132px; border-radius: 20px;
+    margin-top: 14px; width: 100%; height: 124px; border-radius: 22px;
     background: var(--accent); color: var(--accent-text);
-    font-size: 56px; font-weight: 600;
-    display: grid; place-items: center;
-    transition: transform .06s;
+    display: grid; place-items: center; transition: transform .06s;
+    box-shadow: var(--shadow);
   }
+  .big-plus svg { width: 54px; height: 54px; }
   .big-plus:active { transform: scale(.98); }
-  .row-actions { display: flex; gap: 10px; margin-top: 10px; }
-  .row-actions button {
-    flex: 1; height: 52px; border-radius: 14px;
-    background: var(--accent-soft); color: var(--accent); font-weight: 650; font-size: 17px;
+  .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .pill {
+    height: 50px; border-radius: 14px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 650; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
   }
+  .pill svg { width: 18px; height: 18px; }
+  .pill:disabled { opacity: .45; cursor: default; }
 
-  .sub-counters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
-  .sub {
-    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
-    padding: 12px; text-align: center; box-shadow: var(--shadow);
-  }
-  .sub .val { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; margin: 4px 0 8px; }
-  .sub .hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-top: -4px; margin-bottom: 6px; }
-  .sub .btns { display: flex; gap: 8px; }
-  .sub .btns button {
-    flex: 1; height: 44px; border-radius: 12px; font-size: 22px; font-weight: 600;
+  .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .mini { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .mini .val { font-size: 30px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .mini .hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-top: -6px; }
+  .mini .btns { display: flex; gap: 8px; margin-top: auto; }
+  .mini .btns button {
+    flex: 1; height: 40px; border-radius: 11px; font-size: 20px; font-weight: 650;
     background: var(--accent-soft); color: var(--accent);
   }
-  .sub .btns button.plus { background: var(--accent); color: var(--accent-text); }
+  .mini .btns button.on { background: var(--accent); color: var(--accent-text); font-size: 15px; }
 
-  .notes {
-    margin-top: 16px; background: var(--card); border: 1px solid var(--line);
-    border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow);
+  /* ---------- projects tab ---------- */
+  .proj {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 14px 10px 14px 16px; margin-bottom: 10px;
   }
-  .notes textarea {
-    width: 100%; min-height: 70px; resize: vertical; border: 0; outline: none;
-    background: transparent; margin-top: 6px; font-size: 15px;
+  .proj.current { border-color: var(--accent); }
+  .proj .dot {
+    flex: none; width: 42px; height: 42px; border-radius: 12px;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-weight: 750; font-size: 17px;
   }
-  .footer-row { display: flex; gap: 10px; margin: 16px 0 24px; }
-  .footer-row button {
-    flex: 1; height: 46px; border-radius: 14px; border: 1px solid var(--line);
-    background: var(--card); font-weight: 600; font-size: 15px;
+  .proj .body { flex: 1; min-width: 0; }
+  .proj .name { font-weight: 650; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj .meta { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; margin-top: 1px; }
+  .proj .bar { height: 4px; background: var(--accent-soft); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .proj .bar > div { height: 100%; background: var(--accent); }
+  .proj .more {
+    flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--muted);
   }
-  .footer-row button.danger { color: #c0392b; }
+  .proj .more svg { width: 20px; height: 20px; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--accent); margin-left: 6px; vertical-align: 1px;
+  }
+  .empty-hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 18px; }
 
-  /* sheets */
+  /* ---------- notes tab ---------- */
+  .note-card { padding: 14px 16px; margin-bottom: 14px; }
+  .note-card textarea {
+    width: 100%; min-height: 160px; resize: vertical; border: 0; outline: none;
+    background: transparent; margin-top: 8px; font-size: 16px; line-height: 1.5;
+  }
+  .note-card .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .note-card #remindersInput { min-height: 110px; }
+
+  /* ---------- settings tab ---------- */
+  .group-title { margin: 22px 4px 8px; }
+  .group-title:first-of-type { margin-top: 4px; }
+  .group { overflow: hidden; }
+  .item {
+    display: flex; align-items: center; gap: 12px; min-height: 54px;
+    padding: 8px 16px; border-top: 1px solid var(--line); width: 100%; text-align: left;
+  }
+  .item:first-child { border-top: 0; }
+  .item .txt { flex: 1; min-width: 0; }
+  .item .txt small { display: block; color: var(--muted); font-size: 13px; }
+  .item input[type=number], .item input[type=text] {
+    width: 96px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); padding: 0 10px; outline: none; text-align: right;
+  }
+  .item input[type=text] { width: 55%; text-align: left; }
+  .item input:focus { border-color: var(--accent); }
+  .item button.link { color: var(--accent); font-weight: 600; }
+  .item.danger { color: var(--danger); font-weight: 600; justify-content: center; }
+  .item.action { color: var(--accent); font-weight: 600; }
+  .switch { position: relative; width: 50px; height: 30px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; position: absolute; z-index: 1; cursor: pointer; }
+  .switch span {
+    position: absolute; inset: 0; border-radius: 99px; background: var(--line); transition: background .2s;
+  }
+  .switch span::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s;
+  }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(20px); }
+  .foot { text-align: center; color: var(--muted); font-size: 13px; margin-top: 20px; }
+
+  /* ---------- tab bar ---------- */
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: var(--bar);
+    -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar nav { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); height: var(--tabbar-h); }
+  .tabbar button {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: var(--muted); font-size: 11px; font-weight: 600;
+  }
+  .tabbar button svg { width: 25px; height: 25px; }
+  .tabbar button.active { color: var(--accent); }
+
+  /* ---------- sheets ---------- */
   .backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,.35);
+    position: fixed; inset: 0; background: rgba(0,0,0,.38);
     display: none; align-items: flex-end; justify-content: center; z-index: 10;
   }
   .backdrop.open { display: flex; }
   .sheet {
-    background: var(--bg); width: 100%; max-width: 520px;
-    border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
-    max-height: 85vh; overflow: auto;
+    background: var(--bg); width: 100%; max-width: 560px;
+    border-radius: 24px 24px 0 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
+    animation: up .22s ease-out;
   }
-  .sheet h2 { margin: 0 0 12px; font-size: 18px; }
-  .proj-item {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-    padding: 12px 14px; margin-bottom: 8px; width: 100%; text-align: left;
-  }
-  .proj-item.active { border-color: var(--accent); }
-  .proj-item .name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .proj-item .meta { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
-  .primary {
-    width: 100%; height: 50px; border-radius: 14px; background: var(--accent);
-    color: var(--accent-text); font-weight: 650; margin-top: 6px;
-  }
+  @keyframes up { from { transform: translateY(40px); opacity: .4; } }
+  .grabber { width: 38px; height: 5px; border-radius: 9px; background: var(--line); margin: 0 auto 14px; }
+  .sheet h2 { margin: 0 0 14px; font-size: 20px; letter-spacing: -.01em; }
   .field { display: block; margin-bottom: 12px; }
-  .field span { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+  .field span { display: block; font-size: 14px; color: var(--muted); margin-bottom: 5px; }
   .field input {
-    width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--line);
-    background: var(--card); padding: 0 12px; outline: none;
+    width: 100%; height: 48px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); padding: 0 14px; outline: none;
   }
   .field input:focus { border-color: var(--accent); }
-  .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); }
-  .toggle input { width: 22px; height: 22px; accent-color: var(--accent); }
+  .primary {
+    width: 100%; height: 52px; border-radius: 14px; background: var(--accent);
+    color: var(--accent-text); font-weight: 700; margin-top: 4px;
+  }
+  .ghost {
+    width: 100%; height: 50px; border-radius: 14px; background: var(--card);
+    border: 1px solid var(--line); font-weight: 600; margin-top: 8px;
+  }
+  .ghost.danger { color: var(--danger); }
 
   .toast {
-    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom));
-    transform: translateX(-50%) translateY(20px); opacity: 0;
+    position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
+    transform: translateX(-50%) translateY(16px); opacity: 0;
     background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 99px;
     font-size: 14px; font-weight: 600; transition: all .2s; pointer-events: none; z-index: 20;
-    white-space: nowrap;
+    max-width: calc(100% - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .reminder {
-    display: none; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
-    background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 15px; text-align: left;
-  }
-  .reminder.show { display: block; }
-  .reminder .next { display: block; font-weight: 500; color: var(--muted); font-size: 13px; margin-top: 2px; }
-  .timer {
-    margin-top: 16px; display: flex; align-items: center; gap: 12px;
-    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
-    padding: 10px 10px 10px 14px; box-shadow: var(--shadow);
-  }
-  .timer .t { flex: 1; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .timer .label { display: block; }
-  .timer button {
-    height: 44px; padding: 0 18px; border-radius: 12px; font-weight: 650;
-    background: var(--accent-soft); color: var(--accent);
-  }
-  .timer button.running { background: var(--accent); color: var(--accent-text); }
-  .field textarea {
-    width: 100%; min-height: 90px; border-radius: 12px; border: 1px solid var(--line);
-    background: var(--card); padding: 10px 12px; outline: none; resize: vertical; font-size: 15px;
-  }
-  .field textarea:focus { border-color: var(--accent); }
-  .sheet .secondary {
-    width: 100%; height: 46px; border-radius: 14px; border: 1px solid var(--line);
-    background: var(--card); font-weight: 600; margin-top: 8px;
-  }
-  .sheet h3 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 18px 0 6px; }
   .bump { animation: bump .18s ease-out; }
   @keyframes bump { 50% { transform: scale(1.06); } }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>🧶 Row Counter</h1>
-  <button class="icon-btn" id="settingsBtn" aria-label="Settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--card)"/><circle cx="15" cy="12" r="2" fill="var(--card)"/><circle cx="8" cy="18" r="2" fill="var(--card)"/></svg>
+<!-- ============ COUNTER ============ -->
+<main class="view" id="view-counter">
+  <div class="top">
+    <div class="titles">
+      <div class="eyebrow">Crochet project</div>
+      <h1 id="counterTitle">My project</h1>
+    </div>
+    <button class="round-btn soft" id="switchBtn" aria-label="Switch project">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M21 8l-4-4-4 4"/></svg>
+    </button>
+  </div>
+
+  <section class="card counter-card">
+    <div class="label" id="rowLabel">Row</div>
+    <div class="row-num" id="rowNum">0</div>
+    <div class="goal-line" id="goalLine"></div>
+    <div class="progress" id="progressWrap"><div id="progressBar"></div></div>
+    <div class="reminder" id="reminder"></div>
+  </section>
+
+  <button class="big-plus" id="rowPlus" aria-label="Add a row">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
-</header>
+  <div class="row-actions">
+    <button class="pill" id="rowMinus">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      <span id="rowWord">Row</span>
+    </button>
+    <button class="pill" id="undoBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      Undo
+    </button>
+  </div>
 
-<div class="project-bar">
-  <input id="projName" maxlength="60" aria-label="Project name">
-  <button class="icon-btn" id="projectsBtn" aria-label="Switch project">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>
-  </button>
-</div>
-
-<section class="main-counter">
-  <div class="label" id="rowLabel">Row</div>
-  <div class="row-num" id="rowNum">0</div>
-  <div class="goal-line" id="goalLine"></div>
-  <div class="progress" id="progressWrap"><div id="progressBar"></div></div>
-  <div class="reminder" id="reminder"></div>
-</section>
-
-<button class="big-plus" id="rowPlus" aria-label="Add a row">+</button>
-<div class="row-actions">
-  <button id="rowMinus">− <span id="rowWord">Row</span></button>
-  <button id="undoBtn">Undo</button>
-</div>
-
-<div class="sub-counters">
-  <div class="sub">
-    <div class="label">Stitches</div>
-    <div class="val" id="stitchVal">0</div>
-    <div class="hint" id="stitchHint"></div>
-    <div class="btns">
-      <button data-act="stitch-">−</button>
-      <button class="plus" data-act="stitch+">+</button>
+  <div class="mini-grid">
+    <div class="card mini">
+      <div class="label">Repeats</div>
+      <div class="val" id="repeatVal">0</div>
+      <div class="hint" id="repeatHint"></div>
+      <div class="btns">
+        <button id="repeatMinus" aria-label="Remove a repeat">−</button>
+        <button id="repeatPlus" aria-label="Add a repeat">+</button>
+      </div>
+    </div>
+    <div class="card mini">
+      <div class="label">Time</div>
+      <div class="val" id="timeVal">0:00:00</div>
+      <div class="hint" id="timeHint">Paused</div>
+      <div class="btns">
+        <button id="timerBtn">Start</button>
+      </div>
     </div>
   </div>
-  <div class="sub">
-    <div class="label">Repeats</div>
-    <div class="val" id="repeatVal">0</div>
-    <div class="hint" id="repeatHint"></div>
-    <div class="btns">
-      <button data-act="repeat-">−</button>
-      <button class="plus" data-act="repeat+">+</button>
+</main>
+
+<!-- ============ PROJECTS ============ -->
+<main class="view" id="view-projects">
+  <div class="top">
+    <div class="titles">
+      <div class="eyebrow" id="projCount">1 project</div>
+      <h1>Crochet Projects</h1>
+    </div>
+    <button class="round-btn" id="addProjBtn" aria-label="New project">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+  <div id="projList"></div>
+  <div class="empty-hint">Tap a project to start counting. Tap + to add a new one.</div>
+</main>
+
+<!-- ============ NOTES ============ -->
+<main class="view" id="view-notes">
+  <div class="top">
+    <div class="titles">
+      <div class="eyebrow" id="notesFor">My project</div>
+      <h1>Notes</h1>
     </div>
   </div>
+  <section class="card note-card">
+    <div class="label">Pattern notes</div>
+    <textarea id="notes" placeholder="Paste your pattern or jot down hook size, yarn, anything you need to remember."></textarea>
+  </section>
+  <section class="card note-card">
+    <div class="label">Row reminders</div>
+    <div class="sub">One per line, like <b>12: change to blue</b>. You'll get a pop-up when you hit that row.</div>
+    <textarea id="remindersInput" placeholder="12: change to blue&#10;20: start decreases"></textarea>
+  </section>
+</main>
+
+<!-- ============ SETTINGS ============ -->
+<main class="view" id="view-settings">
+  <div class="top">
+    <div class="titles">
+      <div class="eyebrow" id="settingsFor">My project</div>
+      <h1>Settings</h1>
+    </div>
+  </div>
+
+  <div class="label group-title">This project</div>
+  <div class="card group">
+    <label class="item"><span class="txt">Name</span><input type="text" id="nameInput" maxlength="60"></label>
+    <label class="item"><span class="txt">Total rows<small>Leave blank for no goal</small></span><input type="number" inputmode="numeric" min="0" id="goalInput" placeholder="—"></label>
+    <label class="item"><span class="txt">Rows per repeat<small>Repeats count up on their own</small></span><input type="number" inputmode="numeric" min="0" id="repeatEveryInput" placeholder="—"></label>
+    <label class="item"><span class="txt">Working in the round<small>Says "Round" instead of "Row"</small></span><span class="switch"><input type="checkbox" id="roundToggle"><span></span></span></label>
+  </div>
+
+  <div class="card group" style="margin-top:12px">
+    <button class="item action" id="resetBtn">Reset row and repeat counts</button>
+    <button class="item action" id="resetTimerBtn">Reset timer</button>
+  </div>
+
+  <div class="label group-title">App</div>
+  <div class="card group">
+    <label class="item"><span class="txt">Vibrate on tap</span><span class="switch"><input type="checkbox" id="vibrateToggle"><span></span></span></label>
+    <label class="item"><span class="txt">Keep screen awake<small>While the counter is open</small></span><span class="switch"><input type="checkbox" id="wakeToggle"><span></span></span></label>
+  </div>
+
+  <div class="label group-title">Backup</div>
+  <div class="card group">
+    <button class="item action" id="exportBtn">Save backup file</button>
+    <button class="item action" id="importBtn">Restore from backup</button>
+  </div>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+
+  <p class="foot">Everything is saved on this device only.<br>Keyboard: Space adds a row, ↓ takes one away, Z undoes.</p>
+</main>
+
+<!-- ============ TAB BAR ============ -->
+<div class="tabbar">
+  <nav>
+    <button data-tab="counter" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      Counter
+    </button>
+    <button data-tab="projects">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M5.5 8.5c4 1.5 9 1.5 13 0M4.5 13c4.5 2 10.5 2 15 0M9 4.5c-2.5 4.5-2.5 10.5 0 15M15 4.5c2.5 4.5 2.5 10.5 0 15"/></svg>
+      Projects
+    </button>
+    <button data-tab="notes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+      Notes
+    </button>
+    <button data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      Settings
+    </button>
+  </nav>
 </div>
 
-<section class="timer">
-  <div class="t"><span class="label">Time on project</span><span id="timeVal">0:00:00</span></div>
-  <button id="timerBtn">Start</button>
-</section>
-
-<section class="notes">
-  <div class="label">Pattern notes</div>
-  <textarea id="notes" placeholder="e.g. Row 4: ch 3, *dc in next 2, 2dc in next* repeat to end"></textarea>
-</section>
-
-<div class="footer-row">
-  <button id="resetBtn" class="danger">Reset counters</button>
-</div>
-
-<!-- Projects sheet -->
-<div class="backdrop" id="projectsSheet">
+<!-- ============ SHEETS ============ -->
+<div class="backdrop" id="newSheet">
   <div class="sheet">
-    <h2>Projects</h2>
-    <div id="projList"></div>
-    <button class="primary" id="newProjBtn">+ New project</button>
-    <button class="primary" id="deleteProjBtn" style="background:transparent;color:#c0392b;border:1px solid var(--line)">Delete current project</button>
+    <div class="grabber"></div>
+    <h2>New crochet project</h2>
+    <label class="field"><span>Name</span><input type="text" id="newName" maxlength="60" placeholder="e.g. Granny square blanket" enterkeyhint="done"></label>
+    <label class="field"><span>Total rows (optional)</span><input type="number" inputmode="numeric" min="0" id="newGoal" placeholder="Leave blank if you're not sure"></label>
+    <button class="primary" id="createBtn">Create project</button>
+    <button class="ghost" data-close>Cancel</button>
   </div>
 </div>
 
-<!-- Settings sheet -->
-<div class="backdrop" id="settingsSheet">
+<div class="backdrop" id="projSheet">
   <div class="sheet">
-    <h2>Project settings</h2>
-    <label class="field"><span>Total rows in pattern (0 = no goal)</span><input type="number" inputmode="numeric" min="0" id="goalInput"></label>
-    <label class="field"><span>Stitches per row (0 = off). Row goes up when you hit it.</span><input type="number" inputmode="numeric" min="0" id="stitchGoalInput"></label>
-    <label class="field"><span>Rows per repeat (0 = off). Repeats go up automatically.</span><input type="number" inputmode="numeric" min="0" id="repeatEveryInput"></label>
-    <label class="field"><span>Row reminders, one per line like <b>12: change color</b>. Pops up when you get to that row.</span><textarea id="remindersInput" placeholder="12: change to blue&#10;20: start decreases"></textarea></label>
-    <div class="toggle"><span>Working in the round (say "Round" instead of "Row")</span><input type="checkbox" id="roundToggle"></div>
-    <div class="toggle"><span>Vibrate on tap</span><input type="checkbox" id="vibrateToggle"></div>
-    <div class="toggle"><span>Keep screen awake</span><input type="checkbox" id="wakeToggle"></div>
-    <button class="primary" id="closeSettings">Done</button>
-    <h3>Backup</h3>
-    <button class="secondary" id="exportBtn">Save backup file</button>
-    <button class="secondary" id="importBtn">Restore from backup</button>
-    <button class="secondary" id="resetTimerBtn">Reset timer for this project</button>
-    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <div class="grabber"></div>
+    <h2 id="projSheetTitle">Project</h2>
+    <label class="field"><span>Name</span><input type="text" id="renameInput" maxlength="60" enterkeyhint="done"></label>
+    <button class="primary" id="renameBtn">Save name</button>
+    <button class="ghost danger" id="deleteBtn">Delete project</button>
+    <button class="ghost" data-close>Cancel</button>
   </div>
 </div>
 
@@ -311,15 +444,14 @@
 <script>
 (() => {
   const KEY = 'crochet-row-counter-v2';
-  const OLD_KEY = 'crochet-row-counter-v1'; // twister app; same GitHub Pages origin
+  const OLD_KEY = 'crochet-row-counter-v1'; // older twister app on the same GitHub Pages site
   const $ = id => document.getElementById(id);
 
   const blankProject = (name) => ({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    name, row: 0, stitch: 0, repeat: 0,
-    goal: 0, stitchGoal: 0, repeatEvery: 0,
-    notes: '', updated: Date.now(),
-    round: false, reminders: '', time: 0, timerStart: 0
+    name, row: 0, repeat: 0, goal: 0, repeatEvery: 0,
+    notes: '', reminders: '', round: false, time: 0, timerStart: 0,
+    created: Date.now(), updated: Date.now()
   });
   const fixProject = p => Object.assign(blankProject(p.name || 'Untitled'), p);
 
@@ -330,35 +462,31 @@
         const s = JSON.parse(raw);
         if (s && Array.isArray(s.projects) && s.projects.length) {
           s.projects = s.projects.map(fixProject);
+          if (!s.projects.some(p => p.id === s.current)) s.current = s.projects[0].id;
           return s;
         }
       }
     } catch (e) {}
-    const p = blankProject('My project');
-    return { projects: [p], current: p.id, vibrate: true, wake: false };
+    const p = blankProject('My first project');
+    return { projects: [p], current: p.id, vibrate: true, wake: false, tab: 'counter' };
   }
 
   let state = load();
-  let history = []; // undo stack for current session
+  let history = []; // undo stack for this session
+  let sheetProjectId = null;
 
-  function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
-  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   const cur = () => state.projects.find(p => p.id === state.current) || state.projects[0];
+  const word = p => p.round ? 'Round' : 'Row';
 
   function toast(msg) {
     const t = $('toast');
-    t.textContent = msg;
-    t.classList.add('show');
+    t.textContent = msg; t.classList.add('show');
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => t.classList.remove('show'), 1600);
+    toast._t = setTimeout(() => t.classList.remove('show'), 1800);
   }
-  function buzz(ms = 15) {
-    if (state.vibrate && navigator.vibrate) navigator.vibrate(ms);
-  }
-  function bump(el) {
-    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
-  }
+  function buzz(ms = 15) { if (state.vibrate && navigator.vibrate) navigator.vibrate(ms); }
+  function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
   function parseReminders(text) {
     const out = {};
@@ -368,35 +496,51 @@
     });
     return out;
   }
-  const word = p => p.round ? 'Round' : 'Row';
-  function elapsed(p) { return p.time + (p.timerStart ? Date.now() - p.timerStart : 0); }
+  const elapsed = p => p.time + (p.timerStart ? Date.now() - p.timerStart : 0);
   function fmt(ms) {
     const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
     return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
+  function fmtShort(ms) {
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return '';
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return h ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  /* ---------- tabs ---------- */
+  function showTab(tab) {
+    state.tab = tab;
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
+    document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    window.scrollTo(0, 0);
+    save(); render();
+  }
+  document.querySelectorAll('.tabbar button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  $('switchBtn').addEventListener('click', () => showTab('projects'));
+
+  /* ---------- render ---------- */
   function renderTimer() {
     const p = cur();
     $('timeVal').textContent = fmt(elapsed(p));
     $('timerBtn').textContent = p.timerStart ? 'Pause' : 'Start';
-    $('timerBtn').classList.toggle('running', !!p.timerStart);
+    $('timerBtn').classList.toggle('on', !p.timerStart);
+    $('timeHint').textContent = p.timerStart ? 'Running' : 'Paused';
   }
 
-  function render() {
-    const p = cur();
-    const w = word(p);
+  function renderCounter() {
+    const p = cur(), w = word(p);
+    $('counterTitle').textContent = p.name;
     $('rowLabel').textContent = w;
     $('rowWord').textContent = w;
     $('rowPlus').setAttribute('aria-label', 'Add a ' + w.toLowerCase());
-    if (document.activeElement !== $('projName')) $('projName').value = p.name;
-    if (document.activeElement !== $('notes')) $('notes').value = p.notes;
     $('rowNum').textContent = p.row;
-    $('stitchVal').textContent = p.stitch;
     $('repeatVal').textContent = p.repeat;
 
     const gl = $('goalLine');
     if (p.goal > 0) {
       const left = p.goal - p.row;
-      gl.textContent = left > 0 ? `of ${p.goal} · ${left} to go` : `Pattern done! 🎉 (${p.goal} ${w.toLowerCase()}s)`;
+      gl.textContent = left > 0 ? `of ${p.goal} · ${left} to go` : `All ${p.goal} ${w.toLowerCase()}s done! 🎉`;
       gl.classList.toggle('done', left <= 0);
       $('progressWrap').style.display = '';
       $('progressBar').style.width = Math.min(100, p.row / p.goal * 100) + '%';
@@ -405,10 +549,10 @@
       gl.classList.remove('done');
       $('progressWrap').style.display = 'none';
     }
-    $('stitchHint').textContent = p.stitchGoal > 0 ? `of ${p.stitchGoal}` : '';
     $('repeatHint').textContent = p.repeatEvery > 0
-      ? `${w.toLowerCase()} ${p.row % p.repeatEvery || (p.row ? p.repeatEvery : 0)} of ${p.repeatEvery}` : '';
-    // reminders: show what's for this row, and peek at the next one
+      ? `${w.toLowerCase()} ${p.row % p.repeatEvery || (p.row ? p.repeatEvery : 0)} of ${p.repeatEvery}`
+      : 'Tap to count';
+
     const rem = parseReminders(p.reminders);
     const here = rem[p.row];
     const nextRow = Object.keys(rem).map(Number).filter(n => n > p.row).sort((a, b) => a - b)[0];
@@ -423,14 +567,83 @@
       }
       box.classList.add('show');
     } else box.classList.remove('show');
-    renderTimer();
+
     $('undoBtn').disabled = !history.length;
-    $('undoBtn').style.opacity = history.length ? 1 : .45;
+    renderTimer();
   }
 
+  const svgMore = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+  function renderProjects() {
+    const n = state.projects.length;
+    $('projCount').textContent = `${n} project${n === 1 ? '' : 's'}`;
+    const list = $('projList');
+    list.innerHTML = '';
+    [...state.projects].sort((a, b) => b.updated - a.updated).forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'card proj' + (p.id === state.current ? ' current' : '');
+      row.setAttribute('role', 'button');
+      row.tabIndex = 0;
+
+      const dot = document.createElement('div'); dot.className = 'dot';
+      dot.textContent = (p.name.trim()[0] || '?').toUpperCase();
+
+      const body = document.createElement('div'); body.className = 'body';
+      const name = document.createElement('div'); name.className = 'name'; name.textContent = p.name;
+      if (p.id === state.current) {
+        const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = 'Open';
+        name.append(tag);
+      }
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const bits = [`${word(p)} ${p.row}${p.goal ? ' of ' + p.goal : ''}`];
+      const t = fmtShort(elapsed(p)); if (t) bits.push(t);
+      if (p.goal && p.row >= p.goal) bits.push('Done 🎉');
+      meta.textContent = bits.join(' · ');
+      body.append(name, meta);
+      if (p.goal > 0) {
+        const bar = document.createElement('div'); bar.className = 'bar';
+        const fill = document.createElement('div'); fill.style.width = Math.min(100, p.row / p.goal * 100) + '%';
+        bar.append(fill); body.append(bar);
+      }
+
+      const more = document.createElement('button'); more.className = 'more';
+      more.setAttribute('aria-label', 'Project options'); more.innerHTML = svgMore;
+      more.addEventListener('click', e => { e.stopPropagation(); openProjSheet(p.id); });
+
+      row.append(dot, body, more);
+      const open = () => { state.current = p.id; history = []; showTab('counter'); };
+      row.addEventListener('click', open);
+      row.addEventListener('keydown', e => { if (e.key === 'Enter') open(); });
+      list.append(row);
+    });
+  }
+
+  function renderNotes() {
+    const p = cur();
+    $('notesFor').textContent = p.name;
+    if (document.activeElement !== $('notes')) $('notes').value = p.notes;
+    if (document.activeElement !== $('remindersInput')) $('remindersInput').value = p.reminders;
+  }
+
+  function renderSettings() {
+    const p = cur();
+    $('settingsFor').textContent = p.name;
+    const set = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
+    set('nameInput', p.name);
+    set('goalInput', p.goal || '');
+    set('repeatEveryInput', p.repeatEvery || '');
+    $('roundToggle').checked = !!p.round;
+    $('vibrateToggle').checked = !!state.vibrate;
+    $('wakeToggle').checked = !!state.wake;
+  }
+
+  function render() {
+    ({ counter: renderCounter, projects: renderProjects, notes: renderNotes, settings: renderSettings }[state.tab] || renderCounter)();
+  }
+
+  /* ---------- counting ---------- */
   function snapshot() {
     const p = cur();
-    history.push({ id: p.id, row: p.row, stitch: p.stitch, repeat: p.repeat });
+    history.push({ id: p.id, row: p.row, repeat: p.repeat });
     if (history.length > 200) history.shift();
   }
 
@@ -438,8 +651,7 @@
     const p = cur();
     const before = p.row;
     p.row = Math.max(0, p.row + d);
-    if (p.row === before) return;
-    if (d > 0) p.stitch = 0;
+    if (p.row === before) return false;
     if (p.repeatEvery > 0) {
       if (d > 0 && p.row % p.repeatEvery === 0) { p.repeat++; toast(`Repeat ${p.repeat} done`); }
       if (d < 0 && before % p.repeatEvery === 0 && p.repeat > 0) p.repeat--;
@@ -449,141 +661,134 @@
     else if (rem) { toast(`📌 ${rem.join(' · ')}`); buzz([30, 50, 30]); }
     else buzz();
     bump($('rowNum'));
+    return true;
   }
 
   function act(kind) {
     const p = cur();
     snapshot();
+    let changed = true;
     switch (kind) {
-      case 'row+': changeRow(1); break;
-      case 'row-': changeRow(-1); break;
-      case 'stitch+':
-        p.stitch++; buzz(10); bump($('stitchVal'));
-        if (p.stitchGoal > 0 && p.stitch >= p.stitchGoal) { changeRow(1); toast(`${word(p)} ${p.row} started`); }
-        break;
-      case 'stitch-': p.stitch = Math.max(0, p.stitch - 1); buzz(10); break;
+      case 'row+': changed = changeRow(1); break;
+      case 'row-': changed = changeRow(-1); break;
       case 'repeat+': p.repeat++; buzz(10); bump($('repeatVal')); break;
-      case 'repeat-': p.repeat = Math.max(0, p.repeat - 1); buzz(10); break;
+      case 'repeat-': changed = p.repeat > 0; p.repeat = Math.max(0, p.repeat - 1); buzz(10); break;
     }
+    if (!changed) history.pop();
     p.updated = Date.now();
-    save(); render();
+    save(); renderCounter();
   }
 
   $('rowPlus').addEventListener('click', () => act('row+'));
   $('rowNum').addEventListener('click', () => act('row+'));
   $('rowMinus').addEventListener('click', () => act('row-'));
-  document.querySelectorAll('[data-act]').forEach(b =>
-    b.addEventListener('click', () => act(b.dataset.act)));
+  $('repeatPlus').addEventListener('click', () => act('repeat+'));
+  $('repeatMinus').addEventListener('click', () => act('repeat-'));
 
   $('undoBtn').addEventListener('click', () => {
     const h = history.pop();
     if (!h) return;
     const p = state.projects.find(x => x.id === h.id);
-    if (p) { p.row = h.row; p.stitch = h.stitch; p.repeat = h.repeat; }
-    if (h.id !== state.current && p) state.current = p.id;
-    buzz(); save(); render(); toast('Undone');
+    if (p) { p.row = h.row; p.repeat = h.repeat; state.current = p.id; }
+    buzz(); save(); renderCounter(); toast('Undone');
   });
 
-  $('resetBtn').addEventListener('click', () => {
-    if (!confirm('Reset row, stitch and repeat counts to 0 for this project?')) return;
-    snapshot();
-    const p = cur(); p.row = 0; p.stitch = 0; p.repeat = 0;
-    save(); render(); toast('Counters reset (Undo to bring them back)');
-  });
-
-  $('projName').addEventListener('input', e => { cur().name = e.target.value || 'Untitled'; save(); });
-  $('projName').addEventListener('blur', render);
-  $('notes').addEventListener('input', e => { cur().notes = e.target.value; save(); });
-
-  // keyboard: space/enter/up = row+, down/backspace = row-, z = undo
   document.addEventListener('keydown', e => {
-    if (e.target.matches('input, textarea')) return;
+    if (state.tab !== 'counter' || e.target.matches('input, textarea')) return;
+    if (document.querySelector('.backdrop.open')) return;
     if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp') { e.preventDefault(); act('row+'); }
     else if (e.key === 'ArrowDown' || e.key === 'Backspace') { e.preventDefault(); act('row-'); }
     else if (e.key.toLowerCase() === 'z') $('undoBtn').click();
   });
 
-  // sheets
-  function openSheet(id) { $(id).classList.add('open'); }
-  function closeSheet(id) { $(id).classList.remove('open'); }
-  document.querySelectorAll('.backdrop').forEach(b =>
-    b.addEventListener('click', e => { if (e.target === b) { closeSheet(b.id); if (b.id === 'settingsSheet') applySettings(); } }));
-
-  function renderProjects() {
-    const list = $('projList');
-    list.innerHTML = '';
-    [...state.projects].sort((a, b) => b.updated - a.updated).forEach(p => {
-      const b = document.createElement('button');
-      b.className = 'proj-item' + (p.id === state.current ? ' active' : '');
-      const n = document.createElement('span'); n.className = 'name'; n.textContent = p.name;
-      const m = document.createElement('span'); m.className = 'meta';
-      m.textContent = `${word(p)} ${p.row}${p.goal ? '/' + p.goal : ''}`;
-      b.append(n, m);
-      b.addEventListener('click', () => { state.current = p.id; save(); render(); closeSheet('projectsSheet'); });
-      list.appendChild(b);
-    });
-    $('deleteProjBtn').style.display = state.projects.length > 1 ? '' : 'none';
-  }
-  $('projectsBtn').addEventListener('click', () => { renderProjects(); openSheet('projectsSheet'); });
-  $('newProjBtn').addEventListener('click', () => {
-    const name = prompt('Project name', `Project ${state.projects.length + 1}`);
-    if (name === null) return;
-    const p = blankProject(name.trim() || 'Untitled');
-    state.projects.push(p); state.current = p.id;
-    save(); render(); closeSheet('projectsSheet');
-  });
-  $('deleteProjBtn').addEventListener('click', () => {
-    const p = cur();
-    if (!confirm(`Delete "${p.name}"? This can't be undone.`)) return;
-    state.projects = state.projects.filter(x => x.id !== p.id);
-    state.current = state.projects[0].id;
-    history = history.filter(h => h.id !== p.id);
-    save(); render(); renderProjects();
-  });
-
-  $('settingsBtn').addEventListener('click', () => {
-    const p = cur();
-    $('goalInput').value = p.goal || '';
-    $('stitchGoalInput').value = p.stitchGoal || '';
-    $('repeatEveryInput').value = p.repeatEvery || '';
-    $('remindersInput').value = p.reminders || '';
-    $('roundToggle').checked = !!p.round;
-    $('vibrateToggle').checked = !!state.vibrate;
-    $('wakeToggle').checked = !!state.wake;
-    openSheet('settingsSheet');
-  });
-  const num = id => Math.max(0, parseInt($(id).value, 10) || 0);
-  function applySettings() {
-    const p = cur();
-    p.goal = num('goalInput');
-    p.stitchGoal = num('stitchGoalInput');
-    p.repeatEvery = num('repeatEveryInput');
-    p.reminders = $('remindersInput').value;
-    p.round = $('roundToggle').checked;
-    state.vibrate = $('vibrateToggle').checked;
-    state.wake = $('wakeToggle').checked;
-    save(); render(); updateWake();
-  }
-  $('closeSettings').addEventListener('click', () => { applySettings(); closeSheet('settingsSheet'); });
-
-  // project timer: only one project runs at a time
-  function pauseTimer(p) {
-    if (p.timerStart) { p.time += Date.now() - p.timerStart; p.timerStart = 0; }
-  }
+  /* ---------- timer (only one project runs at a time) ---------- */
+  function pauseTimer(p) { if (p.timerStart) { p.time += Date.now() - p.timerStart; p.timerStart = 0; } }
   $('timerBtn').addEventListener('click', () => {
     const p = cur();
     if (p.timerStart) pauseTimer(p);
     else { state.projects.forEach(pauseTimer); p.timerStart = Date.now(); }
     buzz(); save(); renderTimer();
   });
+  setInterval(() => { if (state.tab === 'counter' && cur().timerStart) renderTimer(); }, 500);
+
+  /* ---------- sheets ---------- */
+  function openSheet(id) { $(id).classList.add('open'); }
+  function closeSheet(id) { $(id).classList.remove('open'); }
+  document.querySelectorAll('.backdrop').forEach(b => {
+    b.addEventListener('click', e => { if (e.target === b) closeSheet(b.id); });
+    b.querySelectorAll('[data-close]').forEach(x => x.addEventListener('click', () => closeSheet(b.id)));
+  });
+
+  $('addProjBtn').addEventListener('click', () => {
+    $('newName').value = ''; $('newGoal').value = '';
+    openSheet('newSheet');
+    setTimeout(() => $('newName').focus(), 50);
+  });
+  function createProject() {
+    const p = blankProject($('newName').value.trim() || `Project ${state.projects.length + 1}`);
+    p.goal = Math.max(0, parseInt($('newGoal').value, 10) || 0);
+    state.projects.forEach(pauseTimer);
+    state.projects.push(p); state.current = p.id; history = [];
+    $('newName').blur(); $('newGoal').blur();
+    closeSheet('newSheet'); showTab('counter');
+    toast(`Started "${p.name}"`);
+  }
+  $('createBtn').addEventListener('click', createProject);
+  $('newName').addEventListener('keydown', e => { if (e.key === 'Enter') createProject(); });
+
+  function openProjSheet(id) {
+    const p = state.projects.find(x => x.id === id);
+    if (!p) return;
+    sheetProjectId = id;
+    $('projSheetTitle').textContent = p.name;
+    $('renameInput').value = p.name;
+    openSheet('projSheet');
+  }
+  function renameProject() {
+    const p = state.projects.find(x => x.id === sheetProjectId);
+    if (p) { p.name = $('renameInput').value.trim() || p.name; save(); }
+    $('renameInput').blur(); closeSheet('projSheet'); render();
+  }
+  $('renameBtn').addEventListener('click', renameProject);
+  $('renameInput').addEventListener('keydown', e => { if (e.key === 'Enter') renameProject(); });
+  $('deleteBtn').addEventListener('click', () => {
+    const p = state.projects.find(x => x.id === sheetProjectId);
+    if (!p || !confirm(`Delete "${p.name}"? This can't be undone.`)) return;
+    state.projects = state.projects.filter(x => x.id !== p.id);
+    if (!state.projects.length) state.projects.push(blankProject('My project'));
+    if (!state.projects.some(x => x.id === state.current)) state.current = state.projects[0].id;
+    history = history.filter(h => h.id !== p.id);
+    save(); closeSheet('projSheet'); render(); toast('Project deleted');
+  });
+
+  /* ---------- notes ---------- */
+  $('notes').addEventListener('input', e => { const p = cur(); p.notes = e.target.value; p.updated = Date.now(); save(); });
+  $('remindersInput').addEventListener('input', e => { const p = cur(); p.reminders = e.target.value; save(); });
+
+  /* ---------- settings ---------- */
+  $('nameInput').addEventListener('input', e => {
+    const p = cur(); p.name = e.target.value.trim() || 'Untitled'; save();
+    $('settingsFor').textContent = p.name;
+  });
+  const num = v => Math.max(0, parseInt(v, 10) || 0);
+  $('goalInput').addEventListener('input', e => { cur().goal = num(e.target.value); save(); });
+  $('repeatEveryInput').addEventListener('input', e => { cur().repeatEvery = num(e.target.value); save(); });
+  $('roundToggle').addEventListener('change', e => { cur().round = e.target.checked; save(); });
+  $('vibrateToggle').addEventListener('change', e => { state.vibrate = e.target.checked; save(); buzz(); });
+  $('wakeToggle').addEventListener('change', e => { state.wake = e.target.checked; save(); updateWake(); });
+
+  $('resetBtn').addEventListener('click', () => {
+    if (!confirm(`Set the ${word(cur()).toLowerCase()} and repeat counts back to 0?`)) return;
+    snapshot();
+    const p = cur(); p.row = 0; p.repeat = 0;
+    save(); toast('Counts reset. Undo on the Counter tab brings them back.');
+  });
   $('resetTimerBtn').addEventListener('click', () => {
     if (!confirm('Set the timer for this project back to 0?')) return;
     const p = cur(); p.time = 0; p.timerStart = p.timerStart ? Date.now() : 0;
-    save(); renderTimer(); toast('Timer reset');
+    save(); toast('Timer reset');
   });
-  setInterval(() => { if (cur().timerStart) renderTimer(); }, 500);
 
-  // backup / restore
   $('exportBtn').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -605,11 +810,11 @@
       s.projects = s.projects.map(fixProject);
       if (!s.projects.some(p => p.id === s.current)) s.current = s.projects[0].id;
       state = s; history = [];
-      save(); render(); closeSheet('settingsSheet'); toast('Backup restored');
+      save(); showTab('projects'); toast('Backup restored');
     } catch (err) { alert("That file doesn't look like a Row Counter backup."); }
   });
 
-  // keep screen awake while crocheting
+  /* ---------- keep screen awake ---------- */
   let wakeLock = null;
   async function updateWake() {
     try {
@@ -627,7 +832,8 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
-  render(); updateWake();
+  showTab(['counter', 'projects', 'notes', 'settings'].includes(state.tab) ? state.tab : 'counter');
+  updateWake();
 })();
 </script>
 </body>

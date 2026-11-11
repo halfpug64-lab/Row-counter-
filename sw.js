@@ -1,5 +1,5 @@
 // Caches the app so it works offline after the first visit.
-const CACHE = 'row-counter-v2';
+const CACHE = 'row-counter-v3';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', e => {

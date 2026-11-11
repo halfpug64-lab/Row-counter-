@@ -4,18 +4,17 @@ A row counter for crochet that works on your phone (knitting too). You don't nee
 
 ## What it does
 
-- A big + button for rows, plus − and Undo for accidental taps
-- **Rows or rounds.** Turn on "Working in the round" and the app says Round instead of Row
-- **Row reminders.** Type lines like `12: change to blue` and the app pops up a note when you hit that row. It also shows you what's coming next
-- **Project timer.** Start and pause it to track how long a project takes. Only one project's timer runs at a time
-- Stitch counter. Set stitches per row and the row goes up by itself when you reach that number
-- Repeat counter. Set rows per repeat and it counts your repeats
-- Optional total rows goal with a progress bar
-- More than one project, and each keeps its own counts, notes, reminders and time
-- **Backup and restore.** Save a backup file and load it on another phone or browser
-- Vibrates when you tap and can keep your screen from turning off
+There are four tabs along the bottom, like a regular phone app:
+
+- **Counter:** a big + button for each row, plus − and Undo for accidental taps. It also has a repeat counter and a timer for the project.
+- **Projects:** your crochet projects. Tap **+** to start a new one, tap a project to open it, and tap **⋯** to rename or delete it.
+- **Notes:** pattern notes and row reminders. Type lines like `12: change to blue` and you get a pop-up when you reach that row.
+- **Settings:** total rows goal, rows per repeat, rows or rounds, vibration, keeping the screen on, and backup/restore.
+
+Everything else:
+- Each project keeps its own counts, notes, reminders and time
 - Works offline and can go on your home screen
-- Keyboard shortcuts: Space / Enter / ↑ adds a row, ↓ takes one away, Z undoes
+- Keyboard: Space / Enter / ↑ adds a row, ↓ takes one away, Z undoes
 
 If your old twister row counter is hosted on the same GitHub Pages site, this app picks up those projects the first time you open it.
 
