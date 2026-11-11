@@ -131,7 +131,7 @@
   }
   .big-plus svg { width: 54px; height: 54px; }
   .big-plus:active { transform: scale(.98); }
-  .row-actions { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .row-actions { flex: none; display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
   .pill {
     height: 48px; border-radius: 14px;
     background: var(--accent-soft); color: var(--accent); font-weight: 650; font-size: 16px;
@@ -431,10 +431,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
       <span id="rowWord">Row</span>
     </button>
-    <button class="pill" id="undoBtn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
-      Undo
-    </button>
   </div>
   </div>
 
@@ -626,7 +622,6 @@
   }
 
   let state = load();
-  let history = []; // undo stack for this session
   let sheetProjectId = null;
 
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
@@ -677,7 +672,7 @@
       label.remove();
     } catch (e) {}
   }
-  // kind: 'light' (small taps), 'medium' (undo etc), 'strong' (every new row), 'success' (goal / reminder)
+  // kind: 'light' (small taps), 'medium' (minus row etc), 'strong' (every new row), 'success' (goal / reminder)
   function buzz(kind = 'medium') {
     if (!state.vibrate) return;
     const patterns = { light: 10, medium: 20, strong: 60, success: [60, 70, 60, 70, 80] };
@@ -774,7 +769,6 @@
     } else box.classList.remove('show');
 
     if (document.activeElement !== $('notesPeek')) $('notesPeek').value = p.notes;
-    $('undoBtn').disabled = !history.length;
     renderTimer();
   }
 
@@ -816,7 +810,7 @@
       more.addEventListener('click', e => { e.stopPropagation(); buzz('light'); openProjSheet(p.id); });
 
       row.append(dot, body, more);
-      const open = () => { buzz('light'); state.current = p.id; history = []; showTab('counter'); };
+      const open = () => { buzz('light'); state.current = p.id; showTab('counter'); };
       row.addEventListener('click', open);
       row.addEventListener('keydown', e => { if (e.key === 'Enter') open(); });
       list.append(row);
@@ -847,12 +841,6 @@
   }
 
   /* ---------- counting ---------- */
-  function snapshot() {
-    const p = cur();
-    history.push({ id: p.id, row: p.row, repeat: p.repeat });
-    if (history.length > 200) history.shift();
-  }
-
   function changeRow(d) {
     const p = cur();
     const before = p.row;
@@ -877,7 +865,6 @@
 
   function act(kind) {
     const p = cur();
-    snapshot();
     let changed = true;
     switch (kind) {
       case 'row+': changed = changeRow(1); break;
@@ -885,7 +872,7 @@
       case 'repeat+': p.repeat++; buzz('light'); bump($('repeatVal')); break;
       case 'repeat-': changed = p.repeat > 0; p.repeat = Math.max(0, p.repeat - 1); buzz('light'); break;
     }
-    if (!changed) history.pop();
+    if (!changed) return;
     p.updated = Date.now();
     save(); renderCounter();
   }
@@ -896,20 +883,12 @@
   $('repeatPlus').addEventListener('click', () => act('repeat+'));
   $('repeatMinus').addEventListener('click', () => act('repeat-'));
 
-  $('undoBtn').addEventListener('click', () => {
-    const h = history.pop();
-    if (!h) return;
-    const p = state.projects.find(x => x.id === h.id);
-    if (p) { p.row = h.row; p.repeat = h.repeat; state.current = p.id; }
-    buzz(); save(); renderCounter(); toast('Undone');
-  });
 
   document.addEventListener('keydown', e => {
     if (state.tab !== 'counter' || e.target.matches('input, textarea')) return;
     if (document.querySelector('.backdrop.open')) return;
     if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp') { e.preventDefault(); act('row+'); }
     else if (e.key === 'ArrowDown' || e.key === 'Backspace') { e.preventDefault(); act('row-'); }
-    else if (e.key.toLowerCase() === 'z') $('undoBtn').click();
   });
 
   /* ---------- timer (only one project runs at a time) ---------- */
@@ -940,7 +919,7 @@
     const p = blankProject($('newName').value.trim() || `Project ${state.projects.length + 1}`);
     p.goal = Math.max(0, parseInt($('newGoal').value, 10) || 0);
     state.projects.forEach(pauseTimer);
-    state.projects.push(p); state.current = p.id; history = [];
+    state.projects.push(p); state.current = p.id;
     $('newName').blur(); $('newGoal').blur();
     closeSheet('newSheet'); showTab('counter'); buzz('success');
     toast(`Started "${p.name}"`);
@@ -969,7 +948,6 @@
     state.projects = state.projects.filter(x => x.id !== p.id);
     if (!state.projects.length) state.projects.push(blankProject('My project'));
     if (!state.projects.some(x => x.id === state.current)) state.current = state.projects[0].id;
-    history = history.filter(h => h.id !== p.id);
     save(); closeSheet('projSheet'); render(); toast('Project deleted');
   });
 
@@ -990,10 +968,9 @@
   $('wakeToggle').addEventListener('change', e => { state.wake = e.target.checked; save(); updateWake(); if (canVibrate) buzz('light'); });
 
   $('resetBtn').addEventListener('click', () => {
-    if (!confirm(`Set the ${word(cur()).toLowerCase()} and repeat counts back to 0?`)) return;
-    snapshot();
+    if (!confirm(`Set the ${word(cur()).toLowerCase()} and repeat counts back to 0? This can't be undone.`)) return;
     const p = cur(); p.row = 0; p.repeat = 0;
-    save(); toast('Counts reset. Undo on the Counter tab brings them back.');
+    save(); toast('Counts reset');
   });
   $('resetTimerBtn').addEventListener('click', () => {
     if (!confirm('Set the timer for this project back to 0?')) return;
@@ -1021,7 +998,7 @@
       if (!confirm(`Replace everything here with ${s.projects.length} project(s) from the backup?`)) return;
       s.projects = s.projects.map(fixProject);
       if (!s.projects.some(p => p.id === s.current)) s.current = s.projects[0].id;
-      state = s; history = [];
+      state = s;
       save(); showTab('projects'); toast('Backup restored');
     } catch (err) { alert("That file doesn't look like a Row Counter backup."); }
   });
@@ -1045,7 +1022,7 @@
   }
 
   if (isIOS && !canVibrate) {
-    ['rowPlus', 'rowMinus', 'undoBtn', 'repeatPlus', 'repeatMinus', 'timerBtn',
+    ['rowPlus', 'rowMinus', 'repeatPlus', 'repeatMinus', 'timerBtn',
      'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn'].forEach(id => addHaptic($(id)));
     document.querySelectorAll('.tabbar button').forEach(addHaptic);
   }
