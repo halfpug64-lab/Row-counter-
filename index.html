@@ -649,13 +649,15 @@
       label.remove();
     } catch (e) {}
   }
-  // kind: 'light' (small taps), 'medium' (rows), 'success' (goal / reminder)
+  // kind: 'light' (small taps), 'medium' (undo etc), 'strong' (every new row), 'success' (goal / reminder)
   function buzz(kind = 'medium') {
     if (!state.vibrate) return;
-    const patterns = { light: 8, medium: 15, success: [30, 60, 30, 60, 40] };
+    const patterns = { light: 10, medium: 20, strong: 60, success: [60, 70, 60, 70, 80] };
     if (canVibrate) { navigator.vibrate(patterns[kind] || 15); return; }
     iosTick();
-    if (kind === 'success') { setTimeout(iosTick, 120); setTimeout(iosTick, 240); }
+    // iPhone can't change how hard a tick is, so stack quick ticks to make it feel heavier
+    if (kind === 'strong') setTimeout(iosTick, 45);
+    if (kind === 'success') { setTimeout(iosTick, 45); setTimeout(iosTick, 160); setTimeout(iosTick, 205); setTimeout(iosTick, 320); }
   }
   function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
@@ -833,10 +835,13 @@
       if (d < 0 && before % p.repeatEvery === 0 && p.repeat > 0) p.repeat--;
     }
     const rem = d > 0 && parseReminders(p.reminders)[p.row];
-    if (d > 0 && p.goal > 0 && p.row === p.goal) { toast(`Last ${word(p).toLowerCase()} done! 🎉`); buzz('success'); }
-    else if (rem) { toast(`📌 ${rem.join(' · ')}`); buzz('success'); }
-    else if (repeatDone) { toast(`Repeat ${p.repeat} done`); buzz('success'); }
-    else buzz();
+    let special = false;
+    if (d > 0 && p.goal > 0 && p.row === p.goal) { toast(`Last ${word(p).toLowerCase()} done! 🎉`); special = true; }
+    else if (rem) { toast(`📌 ${rem.join(' · ')}`); special = true; }
+    else if (repeatDone) { toast(`Repeat ${p.repeat} done`); special = true; }
+    // every added row gets a strong haptic; special rows get the longer celebration pattern
+    if (d > 0) buzz(special ? 'success' : 'strong');
+    else buzz('medium');
     bump($('rowNum'));
     return true;
   }
