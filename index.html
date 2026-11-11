@@ -336,6 +336,33 @@
     #projList .proj { margin-bottom: 0; }
   }
 
+  /* ---------- side rail: iPhone Duo style ----------
+     Apple's iPhone Duo guidance moves bars to the right edge (thumb side) on the
+     outer screen and when the inner screen is sideways. Inner screen upright keeps
+     the bottom bar. Outer screen is ~466pt wide, wider than any other iPhone (max 440). */
+  @media (min-width: 450px) and (max-width: 599px), (min-width: 600px) and (orientation: landscape) {
+    :root { --rail-w: 62px; --rail-gap: max(env(safe-area-inset-right), 10px); }
+    .view {
+      padding-bottom: calc(env(safe-area-inset-bottom) + 14px);
+      padding-right: calc(var(--rail-w) + var(--rail-gap) + 12px);
+    }
+    .tabbar {
+      left: auto; right: var(--rail-gap); bottom: max(env(safe-area-inset-bottom), 14px);
+      width: var(--rail-w); max-width: none; margin: 0;
+    }
+    .tabbar nav {
+      grid-template-columns: 1fr; grid-template-rows: repeat(4, 54px);
+      height: auto; width: var(--rail-w); padding: 5px;
+    }
+    .tabbar .lens {
+      top: 5px; left: 5px; right: 5px; bottom: auto; width: auto; height: 54px;
+      transform: translateY(calc(var(--i, 0) * 100%));
+    }
+    .tabbar button svg { width: 25px; height: 25px; }
+    .tabbar .tl { display: none; }
+    .toast { bottom: calc(env(safe-area-inset-bottom) + 18px); }
+  }
+
   /* short phones (iPhone SE etc.) */
   @media (max-height: 700px) {
     .top { padding: 8px 2px 8px; }
@@ -350,6 +377,15 @@
     .item { min-height: 42px; padding: 3px 16px; }
     .group-title { margin: 10px 4px 5px; }
     .foot { margin-top: 8px; }
+  }
+  /* phones turned sideways: very little height */
+  @media (max-height: 450px) {
+    .top { padding: 4px 2px 6px; }
+    .top .eyebrow { display: none; }
+    .top h1 { font-size: 20px; }
+    .round-btn { width: 36px; height: 36px; }
+    .mini .hint { display: none; }
+    .big-plus { min-height: 48px; }
   }
   .bump { animation: bump .18s ease-out; }
   @keyframes bump { 50% { transform: scale(1.06); } }
@@ -507,21 +543,21 @@
 <div class="tabbar">
   <nav>
     <span class="lens" aria-hidden="true"></span>
-    <button data-tab="counter" class="active">
+    <button data-tab="counter" aria-label="Counter" class="active">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-      Counter
+      <span class="tl">Counter</span>
     </button>
-    <button data-tab="projects">
+    <button data-tab="projects" aria-label="Projects">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M5.5 8.5c4 1.5 9 1.5 13 0M4.5 13c4.5 2 10.5 2 15 0M9 4.5c-2.5 4.5-2.5 10.5 0 15M15 4.5c2.5 4.5 2.5 10.5 0 15"/></svg>
-      Projects
+      <span class="tl">Projects</span>
     </button>
-    <button data-tab="notes">
+    <button data-tab="notes" aria-label="Notes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
-      Notes
+      <span class="tl">Notes</span>
     </button>
-    <button data-tab="settings">
+    <button data-tab="settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
-      Settings
+      <span class="tl">Settings</span>
     </button>
   </nav>
 </div>
