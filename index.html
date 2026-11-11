@@ -307,6 +307,32 @@
     max-width: calc(100% - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* layout wrappers (phone: a single column) */
+  .counter-layout, .pane-main, .pane-side, .notes-layout {
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .counter-layout { flex: 1 1 auto; }
+  .pane-main { flex: 1 1 auto; }
+  .pane-side { flex: none; }
+  .notes-layout { flex: 1 1 auto; }
+  .note-peek { display: none; }
+  .set-col > .group-title:first-child { margin-top: 0; }
+
+  /* wide screens: unfolded iPhone Duo, iPad, landscape. Two panes side by side. */
+  @media (min-width: 600px) {
+    .view { max-width: 1040px; padding-left: 24px; padding-right: 24px; }
+    .counter-layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; }
+    .pane-main { min-height: 0; }
+    .pane-side { min-height: 0; }
+    .pane-side .mini-grid { margin-top: 0; }
+    .note-peek { display: flex; flex: 1 1 auto; margin: 12px 0 0; }
+    .notes-layout { flex-direction: row; gap: 16px; }
+    .notes-layout .note-card { flex: 1 1 0; margin-bottom: 0; }
+    .settings-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: start; }
+    #projList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+    #projList .proj { margin-bottom: 0; }
+  }
+
   /* short phones (iPhone SE etc.) */
   @media (max-height: 700px) {
     .top { padding: 8px 2px 8px; }
@@ -340,6 +366,8 @@
     </button>
   </div>
 
+  <div class="counter-layout">
+  <div class="pane-main">
   <section class="card counter-card">
     <div class="label" id="rowLabel">Row</div>
     <div class="row-num" id="rowNum">0</div>
@@ -361,7 +389,9 @@
       Undo
     </button>
   </div>
+  </div>
 
+  <div class="pane-side">
   <div class="mini-grid">
     <div class="card mini">
       <div class="label">Repeats</div>
@@ -380,6 +410,13 @@
         <button id="timerBtn">Start</button>
       </div>
     </div>
+  </div>
+  <!-- only shows on wide screens (unfolded iPhone Duo, iPad) so you can read the pattern while counting -->
+  <section class="card note-card note-peek">
+    <div class="label">Pattern notes</div>
+    <textarea id="notesPeek" placeholder="Paste your pattern here and read it while you count."></textarea>
+  </section>
+  </div>
   </div>
 </main>
 
@@ -406,6 +443,7 @@
       <h1>Notes</h1>
     </div>
   </div>
+  <div class="notes-layout">
   <section class="card note-card">
     <div class="label">Pattern notes</div>
     <textarea id="notes" placeholder="Paste your pattern or jot down hook size, yarn, anything you need to remember."></textarea>
@@ -415,6 +453,7 @@
     <div class="sub">One per line, like <b>12: change to blue</b>. You'll get a pop-up when you hit that row.</div>
     <textarea id="remindersInput" placeholder="12: change to blue&#10;20: start decreases"></textarea>
   </section>
+  </div>
 </main>
 
 <!-- ============ SETTINGS ============ -->
@@ -427,6 +466,7 @@
   </div>
 
   <div class="settings-body">
+  <div class="set-col">
   <div class="label group-title">This project</div>
   <div class="card group">
     <label class="item"><span class="txt">Name</span><input type="text" id="nameInput" maxlength="60"></label>
@@ -439,6 +479,8 @@
     <button class="item action" id="resetBtn">Reset counts</button>
     <button class="item action" id="resetTimerBtn">Reset timer</button>
   </div>
+  </div>
+  <div class="set-col">
 
   <div class="label group-title">App</div>
   <div class="card group">
@@ -454,6 +496,7 @@
   <input type="file" id="importFile" accept="application/json,.json" hidden>
 
   <p class="foot">Everything is saved on this device only.</p>
+  </div>
   </div>
 </main>
 
@@ -659,6 +702,7 @@
       box.classList.add('show');
     } else box.classList.remove('show');
 
+    if (document.activeElement !== $('notesPeek')) $('notesPeek').value = p.notes;
     $('undoBtn').disabled = !history.length;
     renderTimer();
   }
@@ -856,7 +900,7 @@
   });
 
   /* ---------- notes ---------- */
-  $('notes').addEventListener('input', e => { const p = cur(); p.notes = e.target.value; p.updated = Date.now(); save(); });
+  ['notes', 'notesPeek'].forEach(id => $(id).addEventListener('input', e => { const p = cur(); p.notes = e.target.value; p.updated = Date.now(); save(); }));
   $('remindersInput').addEventListener('input', e => { const p = cur(); p.reminders = e.target.value; save(); });
 
   /* ---------- settings ---------- */

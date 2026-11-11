@@ -11,6 +11,8 @@ There are four tabs along the bottom, like a regular phone app:
 - **Notes:** pattern notes and row reminders. Type lines like `12: change to blue` and you get a pop-up when you reach that row.
 - **Settings:** total rows goal, rows per repeat, rows or rounds, vibration, keeping the screen on, and backup/restore.
 
+**iPhone Duo / wide screens:** when you unfold an iPhone Duo (or use an iPad or turn your phone sideways), the app switches to two columns. Your pattern notes sit next to the counter, so you can read the pattern while you count. On the outer screen it works like a normal phone.
+
 Everything else:
 - Each project keeps its own counts, notes, reminders and time
 - Works offline and can go on your home screen
