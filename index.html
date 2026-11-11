@@ -321,7 +321,10 @@
   /* wide screens: unfolded iPhone Duo, iPad, landscape. Two panes side by side. */
   @media (min-width: 600px) {
     .view { max-width: 1040px; padding-left: 24px; padding-right: 24px; }
-    .counter-layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; }
+    /* counter + big buttons on the right (thumb side), pattern and extras on the left */
+    .counter-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 16px; }
+    .pane-main { order: 2; }
+    .pane-side { order: 1; }
     .pane-main { min-height: 0; }
     .pane-side { min-height: 0; }
     .pane-side .mini-grid { margin-top: 0; }
