@@ -980,7 +980,7 @@
   $('resetTimerBtn').addEventListener('click', () => {
     if (!confirm('Set the timer for this project back to 0?')) return;
     const p = cur(); p.time = 0; p.timerStart = p.timerStart ? Date.now() : 0;
-    save(); toast('Timer reset');
+    save(); renderTimer(); toast('Timer reset');
   });
 
   $('exportBtn').addEventListener('click', () => {
