@@ -319,18 +319,49 @@
   .pane-side { flex: none; }
   .notes-layout { flex: 1 1 auto; }
   .note-peek { display: none; }
+  .peek-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .chip {
+    height: 30px; padding: 0 12px; border-radius: 99px; font-size: 13px; font-weight: 650;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .beside-btn { display: none; }
 
   /* wide screens: unfolded iPhone Duo, iPad, landscape. Two panes side by side. */
   @media (min-width: 600px) {
     .view { max-width: 1040px; padding-left: 24px; padding-right: 24px; }
-    /* counter + big buttons on the right (thumb side), pattern and extras on the left */
-    .counter-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 16px; }
-    .pane-main { order: 2; }
-    .pane-side { order: 1; }
-    .pane-main { min-height: 0; }
-    .pane-side { min-height: 0; }
-    .pane-side .mini-grid { margin-top: 0; }
-    .note-peek { display: flex; flex: 1 1 auto; margin: 12px 0 0; }
+    /* Counter tab is a grid; the panes dissolve so each piece can be placed.
+       Buttons always sit in the right column (thumb side).
+       Pattern off: row number on the left, buttons on the right.
+       Pattern on:  pattern on the left, row number + buttons on the right. */
+    .counter-layout {
+      display: grid; gap: 12px 16px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto auto;
+      grid-template-areas: "card plus" "card minus" "card mini";
+    }
+    .pane-main, .pane-side { display: contents; }
+    .counter-card { grid-area: card; min-height: 0; }
+    .big-plus { grid-area: plus; margin: 0; min-height: 0; height: 100%; }
+    .row-actions { grid-area: minus; margin: 0; }
+    .mini-grid { grid-area: mini; margin: 0; }
+    .note-peek { grid-area: notes; margin: 0; min-height: 0; }
+
+    html.notes-beside .note-peek { display: flex; }
+    html.notes-beside .counter-layout {
+      grid-template-rows: minmax(0, 1fr) minmax(64px, 0.55fr) auto auto;
+      grid-template-areas: "notes card" "notes plus" "notes minus" "notes mini";
+    }
+    html.notes-beside .counter-card { padding: 10px 14px; }
+
+    .beside-btn {
+      display: flex; align-items: center; gap: 6px; flex: none;
+      height: 40px; padding: 0 16px 0 12px; border-radius: 99px;
+      background: var(--accent); color: var(--accent-text); font-weight: 650; font-size: 14px;
+      box-shadow: var(--shadow);
+    }
+    .beside-btn svg { width: 18px; height: 18px; }
+    html.notes-beside .beside-btn { background: var(--accent-soft); color: var(--accent); }
+    html.notes-beside .beside-btn svg { transform: rotate(45deg); }
     .notes-layout { flex-direction: row; gap: 16px; }
     .notes-layout .note-card { flex: 1 1 0; margin-bottom: 0; }
     .set-col > .group-title:first-child { margin-top: 0; }
@@ -457,9 +488,12 @@
       </div>
     </div>
   </div>
-  <!-- only shows on wide screens (unfolded iPhone Duo, iPad) so you can read the pattern while counting -->
+  <!-- wide screens only (unfolded iPhone Duo, iPad), and only after "Put next to row counter" in Notes -->
   <section class="card note-card note-peek">
-    <div class="label">Pattern notes</div>
+    <div class="peek-head">
+      <div class="label">Pattern</div>
+      <button class="chip" id="peekHide">Hide</button>
+    </div>
     <textarea id="notesPeek" placeholder="Paste your pattern here and read it while you count."></textarea>
   </section>
   </div>
@@ -488,6 +522,10 @@
       <div class="eyebrow" id="notesFor">My project</div>
       <h1>Notes</h1>
     </div>
+    <button class="beside-btn" id="besideBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span>Put next to row counter</span>
+    </button>
   </div>
   <div class="notes-layout">
   <section class="card note-card">
@@ -1028,9 +1066,26 @@
 
   if (isIOS && !canVibrate) {
     ['rowPlus', 'rowMinus', 'repeatPlus', 'repeatMinus', 'timerBtn',
-     'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn'].forEach(id => addHaptic($(id)));
+     'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn', 'besideBtn', 'peekHide'].forEach(id => addHaptic($(id)));
     document.querySelectorAll('.tabbar button').forEach(addHaptic);
   }
+  // pattern next to the counter (wide screens only)
+  const syncBeside = () => {
+    const on = !!state.notesBeside;
+    document.documentElement.classList.toggle('notes-beside', on);
+    $('besideBtn').querySelector('span').textContent = on ? 'Remove from row counter' : 'Put next to row counter';
+  };
+  syncBeside();
+  $('besideBtn').addEventListener('click', () => {
+    state.notesBeside = !state.notesBeside; save(); syncBeside();
+    if (canVibrate) buzz('light');
+    toast(state.notesBeside ? 'Pattern is next to your row counter' : 'Pattern removed from row counter');
+  });
+  $('peekHide').addEventListener('click', () => {
+    state.notesBeside = false; save(); syncBeside();
+    if (canVibrate) buzz('light');
+    toast('Pattern hidden. Add it back from Notes.');
+  });
   const syncRepeats = () => document.documentElement.classList.toggle('hide-repeats', state.showRepeats === false);
   syncRepeats();
   $('repeatsToggle').addEventListener('change', e => {
