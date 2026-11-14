@@ -152,8 +152,6 @@
     flex: 1; height: 40px; border-radius: 11px; font-size: 20px; font-weight: 650;
     background: var(--accent-soft); color: var(--accent);
   }
-  .mini .btns button.icon-only { flex: 0 0 44px; display: grid; place-items: center; }
-  .mini .btns button.icon-only svg { width: 18px; height: 18px; }
   .mini .btns button.on { background: var(--accent); color: var(--accent-text); font-size: 15px; }
 
   /* ---------- projects tab ---------- */
@@ -456,9 +454,6 @@
       <div class="hint" id="timeHint">Paused</div>
       <div class="btns">
         <button id="timerBtn">Start</button>
-        <button id="timerReset" class="icon-only" aria-label="Reset timer">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
-        </button>
       </div>
     </div>
   </div>
@@ -982,13 +977,11 @@
     const p = cur(); p.row = 0; p.repeat = 0;
     save(); toast('Counts reset');
   });
-  function resetTimer() {
-    if (!confirm(`Set the timer for "${cur().name}" back to 0?`)) return;
+  $('resetTimerBtn').addEventListener('click', () => {
+    if (!confirm('Set the timer for this project back to 0?')) return;
     const p = cur(); p.time = 0; p.timerStart = p.timerStart ? Date.now() : 0;
-    save(); renderTimer(); toast('Timer reset');
-  }
-  $('resetTimerBtn').addEventListener('click', resetTimer);
-  $('timerReset').addEventListener('click', () => { buzz('light'); resetTimer(); });
+    save(); toast('Timer reset');
+  });
 
   $('exportBtn').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -1034,7 +1027,7 @@
   }
 
   if (isIOS && !canVibrate) {
-    ['rowPlus', 'rowMinus', 'repeatPlus', 'repeatMinus', 'timerBtn', 'timerReset',
+    ['rowPlus', 'rowMinus', 'repeatPlus', 'repeatMinus', 'timerBtn',
      'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn'].forEach(id => addHaptic($(id)));
     document.querySelectorAll('.tabbar button').forEach(addHaptic);
   }
