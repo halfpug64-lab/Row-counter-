@@ -141,6 +141,9 @@
   .pill:disabled { opacity: .45; cursor: default; }
 
   .mini-grid { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  /* "Show repeats" off: hide the repeats card + its setting, timer takes the full row */
+  html.hide-repeats #repeatCard, html.hide-repeats #repeatEveryRow { display: none; }
+  html.hide-repeats .mini-grid { grid-template-columns: 1fr; }
   .mini { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
   .mini .val { font-size: 26px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .mini .hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-top: -4px; }
@@ -316,7 +319,6 @@
   .pane-side { flex: none; }
   .notes-layout { flex: 1 1 auto; }
   .note-peek { display: none; }
-  .set-col > .group-title:first-child { margin-top: 0; }
 
   /* wide screens: unfolded iPhone Duo, iPad, landscape. Two panes side by side. */
   @media (min-width: 600px) {
@@ -331,6 +333,7 @@
     .note-peek { display: flex; flex: 1 1 auto; margin: 12px 0 0; }
     .notes-layout { flex-direction: row; gap: 16px; }
     .notes-layout .note-card { flex: 1 1 0; margin-bottom: 0; }
+    .set-col > .group-title:first-child { margin-top: 0; }
     .settings-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: start; }
     #projList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
     #projList .proj { margin-bottom: 0; }
@@ -375,7 +378,7 @@
     .mini .val { font-size: 22px; }
     .mini .btns button { height: 36px; }
     .row-actions, .mini-grid { margin-top: 8px; }
-    .item { min-height: 42px; padding: 3px 16px; }
+    .item { min-height: 40px; padding: 2px 16px; }
     .group-title { margin: 10px 4px 5px; }
     .foot { margin-top: 8px; }
   }
@@ -436,7 +439,7 @@
 
   <div class="pane-side">
   <div class="mini-grid">
-    <div class="card mini">
+    <div class="card mini" id="repeatCard">
       <div class="label">Repeats</div>
       <div class="val" id="repeatVal">0</div>
       <div class="hint" id="repeatHint"></div>
@@ -514,7 +517,7 @@
   <div class="card group">
     <label class="item"><span class="txt">Name</span><input type="text" id="nameInput" maxlength="60"></label>
     <label class="item"><span class="txt">Total rows</span><input type="number" inputmode="numeric" min="0" id="goalInput" placeholder="—"></label>
-    <label class="item"><span class="txt">Rows per repeat</span><input type="number" inputmode="numeric" min="0" id="repeatEveryInput" placeholder="—"></label>
+    <label class="item" id="repeatEveryRow"><span class="txt">Rows per repeat</span><input type="number" inputmode="numeric" min="0" id="repeatEveryInput" placeholder="—"></label>
     <label class="item"><span class="txt">Working in the round</span><span class="switch"><input type="checkbox" switch id="roundToggle"><span></span></span></label>
   </div>
 
@@ -527,6 +530,7 @@
 
   <div class="label group-title">App</div>
   <div class="card group">
+    <label class="item"><span class="txt">Show repeats</span><span class="switch"><input type="checkbox" switch id="repeatsToggle"><span></span></span></label>
     <label class="item"><span class="txt">Haptics</span><span class="switch"><input type="checkbox" switch id="vibrateToggle"><span></span></span></label>
     <label class="item"><span class="txt">Keep screen awake</span><span class="switch"><input type="checkbox" switch id="wakeToggle"><span></span></span></label>
   </div>
@@ -834,6 +838,7 @@
     $('roundToggle').checked = !!p.round;
     $('vibrateToggle').checked = !!state.vibrate;
     $('wakeToggle').checked = !!state.wake;
+    $('repeatsToggle').checked = state.showRepeats !== false;
   }
 
   function render() {
@@ -855,7 +860,7 @@
     let special = false;
     if (d > 0 && p.goal > 0 && p.row === p.goal) { toast(`Last ${word(p).toLowerCase()} done! 🎉`); special = true; }
     else if (rem) { toast(`📌 ${rem.join(' · ')}`); special = true; }
-    else if (repeatDone) { toast(`Repeat ${p.repeat} done`); special = true; }
+    else if (repeatDone && state.showRepeats !== false) { toast(`Repeat ${p.repeat} done`); special = true; }
     // every added row gets a strong haptic; special rows get the longer celebration pattern
     if (d > 0) buzz(special ? 'success' : 'strong');
     else buzz('medium');
@@ -1026,6 +1031,12 @@
      'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn'].forEach(id => addHaptic($(id)));
     document.querySelectorAll('.tabbar button').forEach(addHaptic);
   }
+  const syncRepeats = () => document.documentElement.classList.toggle('hide-repeats', state.showRepeats === false);
+  syncRepeats();
+  $('repeatsToggle').addEventListener('change', e => {
+    state.showRepeats = e.target.checked; save(); syncRepeats();
+    if (canVibrate) buzz('light');
+  });
   const syncHapticSetting = () => document.documentElement.classList.toggle('no-haptics', !state.vibrate);
   syncHapticSetting();
   $('vibrateToggle').addEventListener('change', syncHapticSetting);
