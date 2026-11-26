@@ -180,6 +180,12 @@
   /* "Show repeats" off: hide the repeats card + its setting, timer takes the full row */
   html.hide-repeats #repeatCard, html.hide-repeats #repeatEveryRow { display: none; }
   html.hide-repeats .mini-grid { grid-template-columns: 1fr; }
+  /* "Show timer" off: hide the timer card + its reset button */
+  html.hide-timer #timerCard, html.hide-timer #resetTimerBtn { display: none; }
+  html.hide-timer .mini-grid { grid-template-columns: 1fr; }
+  html.hide-timer .split:has(#resetTimerBtn) { grid-template-columns: 1fr; }
+  /* both off: the whole row goes, and the counter + big + get the space */
+  html.hide-timer.hide-repeats .mini-grid { display: none; }
   .mini { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
   .mini .val { font-size: 26px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .mini .hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-top: -4px; }
@@ -231,7 +237,7 @@
 
   /* ---------- settings tab ---------- */
   .settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-  .group-title { margin: 14px 4px 6px; }
+  .group-title { margin: 20px 4px 6px; }
   .group-title:first-child { margin-top: 0; }
   .group { overflow: hidden; }
   .item {
@@ -387,6 +393,15 @@
       grid-template-rows: minmax(0, 1fr) minmax(64px, 0.55fr) auto auto;
       grid-template-areas: "notes card" "notes plus" "notes minus" "notes mini";
     }
+    /* repeats + timer both hidden: drop the empty grid row so there's no leftover gap */
+    html.hide-timer.hide-repeats .counter-layout {
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas: "card plus" "card minus";
+    }
+    html.hide-timer.hide-repeats.notes-beside .counter-layout {
+      grid-template-rows: minmax(0, 1fr) minmax(64px, 0.7fr) auto;
+      grid-template-areas: "notes card" "notes plus" "notes minus";
+    }
     html.notes-beside .counter-card { padding: 10px 14px; }
 
     .beside-btn {
@@ -447,7 +462,9 @@
     .mini .val { font-size: 22px; }
     .mini .btns button { height: 36px; }
     .row-actions, .mini-grid { margin-top: 8px; }
-    .item { min-height: 40px; padding: 2px 16px; }
+    .item { min-height: 38px; padding: 1px 16px; }
+    .switch { transform: scale(.9); transform-origin: right center; }
+    .settings-body .foot { display: none; }
     .group-title { margin: 10px 4px 5px; }
     .foot { margin-top: 8px; }
   }
@@ -524,7 +541,7 @@
         <button id="repeatPlus" aria-label="Add a repeat">+</button>
       </div>
     </div>
-    <div class="card mini">
+    <div class="card mini" id="timerCard">
       <div class="label">Time</div>
       <div class="val" id="timeVal">0:00:00</div>
       <div class="hint" id="timeHint">Paused</div>
@@ -613,6 +630,7 @@
 
   <div class="label group-title">App</div>
   <div class="card group">
+    <label class="item"><span class="txt">Show timer</span><span class="switch"><input type="checkbox" switch id="timerToggle"><span></span></span></label>
     <label class="item"><span class="txt">Show repeats</span><span class="switch"><input type="checkbox" switch id="repeatsToggle"><span></span></span></label>
     <label class="item"><span class="txt">Haptics</span><span class="switch"><input type="checkbox" switch id="vibrateToggle"><span></span></span></label>
     <label class="item"><span class="txt">Keep screen awake</span><span class="switch"><input type="checkbox" switch id="wakeToggle"><span></span></span></label>
@@ -1046,6 +1064,7 @@
     $('vibrateToggle').checked = !!state.vibrate;
     $('wakeToggle').checked = !!state.wake;
     $('repeatsToggle').checked = state.showRepeats !== false;
+    $('timerToggle').checked = state.showTimer !== false;
   }
 
   function render() {
@@ -1260,6 +1279,18 @@
   syncRepeats();
   $('repeatsToggle').addEventListener('change', e => {
     state.showRepeats = e.target.checked; save(); syncRepeats();
+    if (canVibrate) buzz('light');
+  });
+  const syncTimer = () => document.documentElement.classList.toggle('hide-timer', state.showTimer === false);
+  syncTimer();
+  $('timerToggle').addEventListener('change', e => {
+    state.showTimer = e.target.checked;
+    // don't leave a hidden timer running
+    if (!state.showTimer && state.projects.some(p => p.timerStart)) {
+      state.projects.forEach(pauseTimer);
+      toast('Timer hidden and paused');
+    }
+    save(); syncTimer();
     if (canVibrate) buzz('light');
   });
   const syncHapticSetting = () => document.documentElement.classList.toggle('no-haptics', !state.vibrate);
