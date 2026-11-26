@@ -131,11 +131,25 @@
     font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .now-switch {
-    display: none; flex: none; height: 22px; padding: 0 9px; border-radius: 99px;
-    background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700;
+  .piece-btn {
+    display: none; min-width: 0; height: 26px; padding: 0 10px; border-radius: 99px;
+    background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .now-switch.show { display: block; }
+  .piece-btn.show { display: block; }
+  .now-head .now-label { flex: none; }
+  .now-head .piece-btn.show + .now-label { color: var(--muted); }
+  .sheet-sub { margin: -6px 0 12px; color: var(--muted); font-size: 14px; }
+  .piece-item {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 12px 14px; margin-bottom: 8px; border-radius: 14px;
+    background: var(--card); border: 1px solid var(--line);
+  }
+  .piece-item.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .piece-item .pn { flex: 1; min-width: 0; font-weight: 650; }
+  .piece-item .pm { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; flex: none; }
+  .piece-item .pm.done { color: var(--good); font-weight: 650; }
+  #pieceList { max-height: 55vh; overflow-y: auto; }
   .now-text {
     font-size: 16px; font-weight: 600; line-height: 1.3; margin-top: 2px; color: var(--text);
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
@@ -480,8 +494,8 @@
     <div class="progress" id="progressWrap"><div id="progressBar"></div></div>
     <div class="now-line" id="nowLine">
       <div class="now-head">
+        <button class="piece-btn" id="nowSwitch" aria-label="Choose which piece you're making"></button>
         <span class="now-label" id="nowLabel"></span>
-        <button class="now-switch" id="nowSwitch" aria-label="Switch pattern section"></button>
       </div>
       <div class="now-text" id="nowText"></div>
     </div>
@@ -647,6 +661,16 @@
     <label class="field"><span>Name</span><input type="text" id="newName" maxlength="60" placeholder="e.g. Granny square blanket" enterkeyhint="done"></label>
     <label class="field"><span>Total rows (optional)</span><input type="number" inputmode="numeric" min="0" id="newGoal" placeholder="Leave blank if you're not sure"></label>
     <button class="primary" id="createBtn">Create project</button>
+    <button class="ghost" data-close>Cancel</button>
+  </div>
+</div>
+
+<div class="backdrop" id="pieceSheet">
+  <div class="sheet">
+    <div class="grabber"></div>
+    <h2>Which piece are you making?</h2>
+    <p class="sheet-sub">Each piece keeps its own count, so you can switch back and forth.</p>
+    <div id="pieceList"></div>
     <button class="ghost" data-close>Cancel</button>
   </div>
 </div>
@@ -838,12 +862,13 @@
     $('repeatVal').textContent = p.repeat;
 
     const gl = $('goalLine');
-    if (p.goal > 0) {
-      const left = p.goal - p.row;
-      gl.textContent = left > 0 ? `of ${p.goal} · ${left} to go` : `All ${p.goal} ${w.toLowerCase()}s done! 🎉`;
+    const goal = goalOf(p);
+    if (goal > 0) {
+      const left = goal - p.row;
+      gl.textContent = left > 0 ? `of ${goal} · ${left} to go` : `All ${goal} ${w.toLowerCase()}s done! 🎉`;
       gl.classList.toggle('done', left <= 0);
       $('progressWrap').style.display = '';
-      $('progressBar').style.width = Math.min(100, p.row / p.goal * 100) + '%';
+      $('progressBar').style.width = Math.min(100, p.row / goal * 100) + '%';
     } else {
       gl.textContent = `Tap + after each ${w.toLowerCase()}`;
       gl.classList.remove('done');
@@ -876,42 +901,86 @@
     renderTimer();
   }
 
+  /* Multi-piece patterns (like amigurumi): each "piece" is a section of numbered rounds.
+     The project remembers which piece you're on, and each piece keeps its own count. */
+  const pieceName = sec => sec.name.replace(/\s*\(.*\)\s*$/, '').replace(/\s+-\s+.*$/, '');
+  function currentPiece(p, sections = parsePattern(p.notes)) {
+    if (!sections.length) return null;
+    let idx = sections.findIndex(sec => sec.name === p.patternSection);
+    if (idx < 0) idx = 0;
+    return { sections, idx, sec: sections[idx], multi: sections.length > 1 };
+  }
+  // the goal to show: a multi-piece pattern uses the piece's last round, otherwise "Total rows"
+  function goalOf(p) {
+    const cp = currentPiece(p);
+    return cp && cp.multi ? cp.sec.max : p.goal;
+  }
+
   /* Counter shows rows DONE, so the round you're working on is row + 1. */
   function renderNowLine(p, w) {
     const box = $('nowLine');
-    const sections = parsePattern(p.notes);
-    if (!sections.length) { box.classList.remove('show'); return; }
-    let idx = sections.findIndex(sec => sec.name === p.patternSection);
-    if (idx < 0) idx = 0;
-    const sec = sections[idx];
+    const cp = currentPiece(p);
+    if (!cp) { box.classList.remove('show'); return; }
+    const { sec, multi } = cp;
     const working = p.row + 1;
-    const multi = sections.length > 1;
-    const name = multi ? sec.name.replace(/\s*\(.*\)\s*$/, '') + ' · ' : '';
     box.classList.remove('finished');
+    $('nowSwitch').textContent = multi ? `${pieceName(sec)} ▾` : '';
+    $('nowSwitch').classList.toggle('show', multi);
     if (sec.rounds[working]) {
-      $('nowLabel').textContent = `${name}Now: ${w} ${working}`;
+      $('nowLabel').textContent = `${multi ? '' : 'Now: '}${w} ${working}`;
       $('nowText').textContent = sec.rounds[working];
     } else if (working > sec.max) {
       box.classList.add('finished');
-      $('nowLabel').textContent = `${name}All ${sec.max} ${w.toLowerCase()}s done`;
+      $('nowLabel').textContent = 'Done ✓';
       $('nowText').textContent = sec.after || 'Nice work! 🎉';
     } else {
-      box.classList.remove('show'); return;
+      $('nowLabel').textContent = `${w} ${working}`;
+      $('nowText').textContent = multi ? 'No line for this round in this piece.' : '';
+      if (!multi) { box.classList.remove('show'); return; }
     }
-    $('nowSwitch').textContent = `${idx + 1} of ${sections.length} ›`;
-    $('nowSwitch').classList.toggle('show', multi);
     box.classList.add('show');
   }
-  $('nowSwitch').addEventListener('click', () => {
+
+  function pieceProgress(p, sec, isCurrent) {
+    if (isCurrent) return { row: p.row, repeat: p.repeat };
+    return (p.pieces && p.pieces[sec.name]) || { row: 0, repeat: 0 };
+  }
+  function openPieceSheet() {
     const p = cur();
-    const sections = parsePattern(p.notes);
-    if (sections.length < 2) return;
-    let idx = sections.findIndex(sec => sec.name === p.patternSection);
-    if (idx < 0) idx = 0;
-    p.patternSection = sections[(idx + 1) % sections.length].name;
+    const cp = currentPiece(p);
+    if (!cp || !cp.multi) return;
+    const list = $('pieceList');
+    list.innerHTML = '';
+    cp.sections.forEach((sec, i) => {
+      const isCur = i === cp.idx;
+      const prog = pieceProgress(p, sec, isCur);
+      const b = document.createElement('button');
+      b.className = 'piece-item' + (isCur ? ' current' : '');
+      const n = document.createElement('span'); n.className = 'pn'; n.textContent = sec.name;
+      const m = document.createElement('span'); m.className = 'pm';
+      if (prog.row >= sec.max) { m.textContent = 'Done ✓'; m.classList.add('done'); }
+      else if (prog.row > 0) m.textContent = `${prog.row} of ${sec.max} done`;
+      else m.textContent = `${sec.max} ${word(p).toLowerCase()}${sec.max === 1 ? '' : 's'}`;
+      b.append(n, m);
+      b.addEventListener('click', () => { choosePiece(sec.name); closeSheet('pieceSheet'); });
+      list.append(b);
+    });
+    openSheet('pieceSheet');
+  }
+  function choosePiece(name) {
+    const p = cur();
+    const cp = currentPiece(p);
+    if (!cp || cp.sec.name === name) return;
+    p.pieces = p.pieces || {};
+    p.pieces[cp.sec.name] = { row: p.row, repeat: p.repeat };   // park the old piece's count
+    const next = p.pieces[name] || { row: 0, repeat: 0 };        // pick up the new one where you left it
+    p.row = next.row; p.repeat = next.repeat;
+    p.patternSection = name;
+    p.updated = Date.now();
     save(); renderCounter(); buzz('light');
-    toast(`Following: ${p.patternSection}`);
-  });
+    toast(`Now making: ${name.replace(/\s*\(.*\)\s*$/, '')}`);
+  }
+  $('nowSwitch').addEventListener('click', openPieceSheet);
 
   const svgMore = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
   function renderProjects() {
@@ -935,14 +1004,15 @@
         name.append(tag);
       }
       const meta = document.createElement('div'); meta.className = 'meta';
-      const bits = [`${word(p)} ${p.row}${p.goal ? ' of ' + p.goal : ''}`];
+      const goal = goalOf(p), cp = currentPiece(p);
+      const bits = [`${cp && cp.multi ? pieceName(cp.sec) + ' · ' : ''}${word(p)} ${p.row}${goal ? ' of ' + goal : ''}`];
       const t = fmtShort(elapsed(p)); if (t) bits.push(t);
-      if (p.goal && p.row >= p.goal) bits.push('Done 🎉');
+      if (goal && p.row >= goal) bits.push('Done 🎉');
       meta.textContent = bits.join(' · ');
       body.append(name, meta);
-      if (p.goal > 0) {
+      if (goal > 0) {
         const bar = document.createElement('div'); bar.className = 'bar';
-        const fill = document.createElement('div'); fill.style.width = Math.min(100, p.row / p.goal * 100) + '%';
+        const fill = document.createElement('div'); fill.style.width = Math.min(100, p.row / goal * 100) + '%';
         bar.append(fill); body.append(bar);
       }
 
@@ -995,7 +1065,8 @@
     }
     const rem = d > 0 && parseReminders(p.reminders)[p.row + 1]; // heads-up before you start that row
     let special = false;
-    if (d > 0 && p.goal > 0 && p.row === p.goal) { toast(`Last ${word(p).toLowerCase()} done! 🎉`); special = true; }
+    const goal = goalOf(p);
+    if (d > 0 && goal > 0 && p.row === goal) { toast(`Last ${word(p).toLowerCase()} done! 🎉`); special = true; }
     else if (rem) { toast(`📌 ${rem.join(' · ')}`); special = true; }
     else if (repeatDone && state.showRepeats !== false) { toast(`Repeat ${p.repeat} done`); special = true; }
     // every added row gets a strong haptic; special rows get the longer celebration pattern
