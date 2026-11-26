@@ -120,6 +120,28 @@
     background: var(--accent-soft); color: var(--accent); font-weight: 650; font-size: 15px; text-align: left;
   }
   .reminder.show { display: block; }
+  /* the current round's line from the pattern notes */
+  .now-line {
+    display: none; margin-top: 10px; padding: 9px 12px; border-radius: 12px; text-align: left;
+    background: var(--bg); border: 1px solid var(--line);
+  }
+  .now-line.show { display: block; }
+  .now-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
+  .now-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .now-switch {
+    display: none; flex: none; height: 22px; padding: 0 9px; border-radius: 99px;
+    background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700;
+  }
+  .now-switch.show { display: block; }
+  .now-text {
+    font-size: 16px; font-weight: 600; line-height: 1.3; margin-top: 2px; color: var(--text);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    user-select: text; -webkit-user-select: text;
+  }
+  .now-line.finished .now-text { font-weight: 500; color: var(--muted); }
   .reminder .next { display: block; font-weight: 500; color: var(--muted); font-size: 13px; margin-top: 2px; }
 
   .big-plus {
@@ -404,6 +426,8 @@
     .top h1 { font-size: 24px; }
     .counter-card { padding: 10px 14px; }
     .reminder { margin-top: 8px; padding: 7px 10px; font-size: 14px; }
+    .now-line { margin-top: 8px; padding: 6px 10px; }
+    .now-text { font-size: 15px; -webkit-line-clamp: 2; }
     .pill { height: 42px; }
     .mini { padding: 10px; gap: 4px; }
     .mini .val { font-size: 22px; }
@@ -454,6 +478,13 @@
     <div class="row-num" id="rowNum">0</div>
     <div class="goal-line" id="goalLine"></div>
     <div class="progress" id="progressWrap"><div id="progressBar"></div></div>
+    <div class="now-line" id="nowLine">
+      <div class="now-head">
+        <span class="now-label" id="nowLabel"></span>
+        <button class="now-switch" id="nowSwitch" aria-label="Switch pattern section"></button>
+      </div>
+      <div class="now-text" id="nowText"></div>
+    </div>
     <div class="reminder" id="reminder"></div>
   </section>
 
@@ -534,7 +565,7 @@
   </section>
   <section class="card note-card small">
     <div class="label">Row reminders</div>
-    <div class="sub">One per line, like <b>12: change to blue</b>. You'll get a pop-up when you hit that row.</div>
+    <div class="sub">One per line, like <b>12: change to blue</b>. You'll get a pop-up right before you start that row.</div>
     <textarea id="remindersInput" placeholder="12: change to blue&#10;20: start decreases"></textarea>
   </section>
   </div>
@@ -727,6 +758,33 @@
   }
   function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
+  /* Find round/row lines in the pattern notes, e.g. "Rnd 6: [4 sc blo, inc blo] x6 (36)",
+     "Row 12. sc across", "Rnds 10-12: sc around". Lines are grouped into sections by
+     paragraph: a section's name is the first line of the block the round lines sit in. */
+  const ROUND_RE = /^\s*(?:rnds?|rounds?|rds?|rows?|r)\.?\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*[:.)\-–]?\s+(.+)$/i;
+  function parsePattern(text) {
+    const sections = [];
+    let cur = null, paraFirst = null;
+    (text || '').split('\n').forEach(raw => {
+      const line = raw.trim();
+      if (!line) { paraFirst = null; cur = null; return; }
+      const m = line.match(ROUND_RE);
+      if (m) {
+        if (!cur) {
+          cur = { name: paraFirst || 'Pattern', rounds: {}, max: 0, after: '' };
+          sections.push(cur);
+        }
+        const a = +m[1], b = m[2] ? +m[2] : a;
+        for (let n = Math.min(a, b); n <= Math.max(a, b); n++) cur.rounds[n] = m[3].trim();
+        cur.max = Math.max(cur.max, a, b);
+      } else {
+        if (paraFirst === null) paraFirst = line;
+        if (cur && !cur.after) cur.after = line; // e.g. "Invisible fasten off..."
+      }
+    });
+    return sections.filter(sec => sec.max > 0);
+  }
+
   function parseReminders(text) {
     const out = {};
     (text || '').split('\n').forEach(line => {
@@ -795,13 +853,17 @@
       ? `${w.toLowerCase()} ${p.row % p.repeatEvery || (p.row ? p.repeatEvery : 0)} of ${p.repeatEvery}`
       : 'Tap to count';
 
+    renderNowLine(p, w);
+
+    // reminders are for the row you're about to work (counter shows rows done)
     const rem = parseReminders(p.reminders);
-    const here = rem[p.row];
-    const nextRow = Object.keys(rem).map(Number).filter(n => n > p.row).sort((a, b) => a - b)[0];
+    const working = p.row + 1;
+    const here = rem[working];
+    const nextRow = Object.keys(rem).map(Number).filter(n => n > working).sort((a, b) => a - b)[0];
     const box = $('reminder');
     box.textContent = '';
     if (here || nextRow) {
-      if (here) box.append(`📌 ${w} ${p.row}: ${here.join(' · ')}`);
+      if (here) box.append(`📌 ${w} ${working}: ${here.join(' · ')}`);
       if (nextRow) {
         const n = document.createElement('span'); n.className = 'next';
         n.textContent = `Next: ${w.toLowerCase()} ${nextRow}, ${rem[nextRow].join(' · ')}`;
@@ -813,6 +875,43 @@
     if (document.activeElement !== $('notesPeek')) $('notesPeek').value = p.notes;
     renderTimer();
   }
+
+  /* Counter shows rows DONE, so the round you're working on is row + 1. */
+  function renderNowLine(p, w) {
+    const box = $('nowLine');
+    const sections = parsePattern(p.notes);
+    if (!sections.length) { box.classList.remove('show'); return; }
+    let idx = sections.findIndex(sec => sec.name === p.patternSection);
+    if (idx < 0) idx = 0;
+    const sec = sections[idx];
+    const working = p.row + 1;
+    const multi = sections.length > 1;
+    const name = multi ? sec.name.replace(/\s*\(.*\)\s*$/, '') + ' · ' : '';
+    box.classList.remove('finished');
+    if (sec.rounds[working]) {
+      $('nowLabel').textContent = `${name}Now: ${w} ${working}`;
+      $('nowText').textContent = sec.rounds[working];
+    } else if (working > sec.max) {
+      box.classList.add('finished');
+      $('nowLabel').textContent = `${name}All ${sec.max} ${w.toLowerCase()}s done`;
+      $('nowText').textContent = sec.after || 'Nice work! 🎉';
+    } else {
+      box.classList.remove('show'); return;
+    }
+    $('nowSwitch').textContent = `${idx + 1} of ${sections.length} ›`;
+    $('nowSwitch').classList.toggle('show', multi);
+    box.classList.add('show');
+  }
+  $('nowSwitch').addEventListener('click', () => {
+    const p = cur();
+    const sections = parsePattern(p.notes);
+    if (sections.length < 2) return;
+    let idx = sections.findIndex(sec => sec.name === p.patternSection);
+    if (idx < 0) idx = 0;
+    p.patternSection = sections[(idx + 1) % sections.length].name;
+    save(); renderCounter(); buzz('light');
+    toast(`Following: ${p.patternSection}`);
+  });
 
   const svgMore = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
   function renderProjects() {
@@ -894,7 +993,7 @@
       if (d > 0 && p.row % p.repeatEvery === 0) { p.repeat++; repeatDone = true; }
       if (d < 0 && before % p.repeatEvery === 0 && p.repeat > 0) p.repeat--;
     }
-    const rem = d > 0 && parseReminders(p.reminders)[p.row];
+    const rem = d > 0 && parseReminders(p.reminders)[p.row + 1]; // heads-up before you start that row
     let special = false;
     if (d > 0 && p.goal > 0 && p.row === p.goal) { toast(`Last ${word(p).toLowerCase()} done! 🎉`); special = true; }
     else if (rem) { toast(`📌 ${rem.join(' · ')}`); special = true; }
@@ -1066,7 +1165,7 @@
 
   if (isIOS && !canVibrate) {
     ['rowPlus', 'rowMinus', 'repeatPlus', 'repeatMinus', 'timerBtn',
-     'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn', 'besideBtn', 'peekHide'].forEach(id => addHaptic($(id)));
+     'switchBtn', 'addProjBtn', 'createBtn', 'renameBtn', 'besideBtn', 'peekHide', 'nowSwitch'].forEach(id => addHaptic($(id)));
     document.querySelectorAll('.tabbar button').forEach(addHaptic);
   }
   // pattern next to the counter (wide screens only)
