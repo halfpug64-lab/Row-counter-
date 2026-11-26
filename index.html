@@ -741,7 +741,11 @@
 
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   const cur = () => state.projects.find(p => p.id === state.current) || state.projects[0];
-  const word = p => p.round ? 'Round' : 'Row';
+  const word = p => {
+    const cp = p.notes ? currentPiece(p) : null;
+    if (cp && cp.sec.kind === 'step') return 'Step';
+    return p.round ? 'Round' : 'Row';
+  };
 
   function toast(msg) {
     const t = $('toast');
@@ -804,27 +808,55 @@
      "Row 12. sc across", "Rnds 10-12: sc around". Lines are grouped into sections by
      paragraph: a section's name is the first line of the block the round lines sit in. */
   const ROUND_RE = /^\s*(?:rnds?|rounds?|rds?|rows?|r)\.?\s*(\d+)(?:\s*[-–]\s*(\d+))?\s*[:.)\-–]?\s+(.+)$/i;
+  // numbered steps: "Step 2. Sl st", "Step 1A.", "3) Ch 1", "4. Repeat steps 2-3..."
+  const STEP_RE = /^\s*(?:(step)\s*(\d+)([a-z])?\s*[.):\-–]?|(\d+)([a-z])?\s*[.)])\s*(.*)$/i;
+  // a heading looks like "PIE CRUST" or "LATTICE DESIGN (tan)": mostly capital letters
+  const isHeading = line => {
+    const letters = line.replace(/\(.*?\)/g, '').replace(/[^a-z]/gi, '');
+    return letters.length >= 3 && letters.replace(/[^A-Z]/g, '').length / letters.length > 0.7;
+  };
   function parsePattern(text) {
     const sections = [];
-    let cur = null, paraFirst = null;
+    let cur = null, paraFirst = null, lastHeading = null, pending = null;
+    const start = kind => {
+      cur = { name: paraFirst || lastHeading || 'Pattern', kind, rounds: {}, max: 0, after: '' };
+      sections.push(cur);
+    };
+    const addStep = (n, t) => {
+      if (!t) return;
+      cur.rounds[n] = cur.rounds[n] ? cur.rounds[n] + ' → ' + t : t; // 1A, 1B, 1C join into step 1
+    };
     (text || '').split('\n').forEach(raw => {
       const line = raw.trim();
-      if (!line) { paraFirst = null; cur = null; return; }
+      if (!line) {
+        paraFirst = null; pending = null;
+        if (cur && cur.kind === 'round') cur = null;   // step lists can have blank lines between steps
+        return;
+      }
       const m = line.match(ROUND_RE);
       if (m) {
-        if (!cur) {
-          cur = { name: paraFirst || 'Pattern', rounds: {}, max: 0, after: '' };
-          sections.push(cur);
-        }
+        if (!cur || cur.kind !== 'round') start('round');
+        pending = null;
         const a = +m[1], b = m[2] ? +m[2] : a;
         for (let n = Math.min(a, b); n <= Math.max(a, b); n++) cur.rounds[n] = m[3].trim();
         cur.max = Math.max(cur.max, a, b);
-      } else {
-        if (paraFirst === null) paraFirst = line;
-        if (cur && !cur.after) cur.after = line; // e.g. "Invisible fasten off..."
+        return;
       }
+      const st = (!cur || cur.kind === 'step') && line.match(STEP_RE);
+      if (st && (paraFirst !== null || lastHeading !== null)) {   // a step needs a heading above it
+        if (!cur) start('step');
+        const n = +(st[2] || st[4]);
+        cur.max = Math.max(cur.max, n);
+        const t = st[6].trim();
+        if (t) { addStep(n, t); pending = null; } else pending = n;  // "Step 1." with text on the next line
+        return;
+      }
+      if (pending !== null && cur) { addStep(pending, line); pending = null; return; }
+      if (isHeading(line)) { cur = null; lastHeading = line; }      // new piece starts
+      if (paraFirst === null) paraFirst = line;
+      if (cur && !cur.after) cur.after = line; // e.g. "Invisible fasten off..."
     });
-    return sections.filter(sec => sec.max > 0);
+    return sections.filter(sec => sec.max > 0 && Object.keys(sec.rounds).length);
   }
 
   function parseReminders(text) {
@@ -921,7 +953,7 @@
 
   /* Multi-piece patterns (like amigurumi): each "piece" is a section of numbered rounds.
      The project remembers which piece you're on, and each piece keeps its own count. */
-  const pieceName = sec => sec.name.replace(/\s*\(.*\)\s*$/, '').replace(/\s+-\s+.*$/, '');
+  const pieceName = sec => sec.name.replace(/\s+[-–—]\s+.*$/, '').replace(/\s*\(.*?\)\s*$/, '').trim();
   function currentPiece(p, sections = parsePattern(p.notes)) {
     if (!sections.length) return null;
     let idx = sections.findIndex(sec => sec.name === p.patternSection);
@@ -978,7 +1010,10 @@
       const m = document.createElement('span'); m.className = 'pm';
       if (prog.row >= sec.max) { m.textContent = 'Done ✓'; m.classList.add('done'); }
       else if (prog.row > 0) m.textContent = `${prog.row} of ${sec.max} done`;
-      else m.textContent = `${sec.max} ${word(p).toLowerCase()}${sec.max === 1 ? '' : 's'}`;
+      else {
+        const unit = sec.kind === 'step' ? 'step' : (p.round ? 'round' : 'row');
+        m.textContent = `${sec.max} ${unit}${sec.max === 1 ? '' : 's'}`;
+      }
       b.append(n, m);
       b.addEventListener('click', () => { choosePiece(sec.name); closeSheet('pieceSheet'); });
       list.append(b);
@@ -996,7 +1031,7 @@
     p.patternSection = name;
     p.updated = Date.now();
     save(); renderCounter(); buzz('light');
-    toast(`Now making: ${name.replace(/\s*\(.*\)\s*$/, '')}`);
+    toast(`Now making: ${pieceName({ name })}`);
   }
   $('nowSwitch').addEventListener('click', openPieceSheet);
 
